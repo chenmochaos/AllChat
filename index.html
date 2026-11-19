@@ -1,33 +1,54 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AllChat · 群聊工作区</title>
+  <title>AllChat — Multi-Agent Planning</title>
   <link rel="stylesheet" href="styles.css">
   <script defer src="app.js"></script>
 </head>
 <body>
-  <header class="topbar">
+  <header class="topbar" id="home">
     <div class="top">
-      <a href="./index.html" class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>AllChat</a>
-      <nav aria-label="工作区">
-        <button id="history" class="quiet">历史记录</button>
+      <a href="#home" class="brand"><span class="brand-mark" aria-hidden="true"></span>ALLCHAT</a>
+      <nav aria-label="Primary">
+        <a class="nav-link" href="#workflow">HOW IT WORKS</a>
+        <a class="nav-cta" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a>
       </nav>
     </div>
   </header>
   <main>
-    <section class="chat" aria-labelledby="runTitle">
+    <section class="home" aria-labelledby="heroTitle">
+      <canvas id="heroArt" width="208" height="136" aria-hidden="true"></canvas>
+      <div class="hero-copy">
+        <h1 id="heroTitle">AllChat</h1>
+        <p class="hero-category">Multi-agent planning automation</p>
+        <p class="hero-lede">Give multiple AI models one brief. Collect independent proposals, resolve disagreements through review, and hand off a plan every model has approved.</p>
+        <div class="hero-actions"><a class="hero-primary" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a><a class="hero-secondary" href="#workflow">HOW IT WORKS <span aria-hidden="true">↓</span></a></div>
+      </div>
+    </section>
+    <section class="workflow" id="workflow" aria-labelledby="workflowTitle">
+      <div class="section-intro"><h2 id="workflowTitle">From brief to approved plan.</h2></div>
+      <div class="steps">
+        <article class="step"><span class="step-number">01</span><h3>Think independently</h3><p>Each model develops a proposal before seeing the others.</p><span class="step-glyph" aria-hidden="true">┌ ┐<br>└ ┘</span></article>
+        <article class="step"><span class="step-number">02</span><h3>Review the plan</h3><p>Models assess the same draft. Disagreements stay attached to the decision.</p><span class="step-glyph" aria-hidden="true">┌─┬─┐<br>└─┴─┘</span></article>
+        <article class="step"><span class="step-number">03</span><h3>Confirm, then build</h3><p>A revision is ready when every model agrees it is clear and executable.</p><span class="step-glyph" aria-hidden="true">┌───┐<br>└─✓─┘</span></article>
+      </div>
+    </section>
+    <section class="workspace" id="workspace" aria-labelledby="workspaceTitle">
+      <div class="workspace-heading"><h2 id="workspaceTitle">Review workspace</h2><a href="#home" class="back-top">BACK TO TOP ↑</a></div>
+      <section class="chat" lang="zh-CN" aria-labelledby="runTitle">
       <div class="chat-head">
         <div class="chat-title">
-          <div class="context"><span id="source">示例讨论</span><span class="context-dot">·</span><span id="verdict" aria-live="polite"></span></div>
-          <h1 id="runTitle"></h1>
+          <div class="context"><span id="source">评审示例</span><span class="context-dot" aria-hidden="true">/</span><span id="verdict" aria-live="polite"></span></div>
+          <h3 id="runTitle"></h3>
         </div>
+        <button id="history" class="history-button">历史记录</button>
       </div>
-      <div class="room-head"><strong>成员</strong><span id="memberCount"></span></div>
+      <div class="room-head"><strong>参与模型</strong><span id="memberCount"></span></div>
       <div id="members" aria-label="讨论成员"></div>
-      <div class="view-tabs" aria-label="查看内容"><button type="button" id="showChat" aria-pressed="true">群聊</button><button type="button" id="showPlan" aria-pressed="false">方案 <span id="versions"></span></button></div>
-      <div id="conversation" class="viewport" role="log" aria-label="讨论消息" tabindex="0"></div>
+      <div class="view-tabs" aria-label="查看内容"><button type="button" id="showChat" aria-pressed="true">评审记录</button><button type="button" id="showPlan" aria-pressed="false">方案 <span id="versions"></span></button></div>
+      <div id="conversation" class="viewport" role="log" aria-label="模型提交记录" tabindex="0"></div>
       <div id="plan" class="viewport plan" aria-label="方案正文" hidden>
         <div id="planBody"></div>
       </div>
@@ -36,13 +57,14 @@
         <button type="button" class="icon-button model-picker" id="config" aria-label="选择参会模型" title="选择参会模型">
           <span id="composeModels" aria-hidden="true"></span><span class="caret" aria-hidden="true">⌄</span>
         </button>
-        <textarea id="task" rows="1" maxlength="2000" required placeholder="写下一个问题，邀请 AI 一起讨论…" aria-label="新讨论的主题"></textarea>
-        <button class="send" type="submit" aria-label="开始讨论" title="开始讨论">↑</button>
+        <textarea id="task" rows="1" maxlength="2000" required placeholder="输入需求，发起方案评审…" aria-label="新评审的需求"></textarea>
+        <button class="send" type="submit" aria-label="发起评审" title="发起评审">↵</button>
       </form>
-      <p class="demo-note">本地交互演示 · 回复为示例内容</p>
+      <p class="demo-note">本地演示 · 模型提交为示例</p>
+      </section>
     </section>
   </main>
-<dialog id="panel" aria-labelledby="panelTitle">
+  <dialog id="panel" lang="zh-CN" aria-labelledby="panelTitle">
     <div class="dialog-head"><h2 id="panelTitle"></h2><button class="icon-button close" type="button" aria-label="关闭" id="close">×</button></div>
     <div id="panelBody"></div>
   </dialog>

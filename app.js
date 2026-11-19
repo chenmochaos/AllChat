@@ -111,7 +111,7 @@ function showView(plan) {
 $('#showChat').onclick = () => showView(false);
 $('#showPlan').onclick = () => showView(true);
 
-function message(kind, author, text, version = 0) {
+function message(kind, author, text, label = '') {
   const item = elem('div', 'message ' + kind);
   const content = elem('div', 'message-content');
   const name = elem('div', 'message-name', author);
@@ -122,7 +122,7 @@ function message(kind, author, text, version = 0) {
     item.dataset.author = author;
     item.tabIndex = -1;
   }
-  if (version) name.append(elem('span', 'message-version', 'v' + version));
+  if (label) name.append(elem('span', 'message-label', label));
   content.append(name, elem('p', 'bubble', text));
   item.append(content);
   return item;
@@ -152,14 +152,17 @@ function render() {
     lastView = stateKey;
 
     $('#runTitle').textContent = run.title;
-    $('#source').textContent = archive ? '实测归档' : preview ? '示例讨论' : '本地演示';
+    $('#source').textContent = archive ? '实测归档' : preview ? '评审示例' : '本地演示';
     $('#memberCount').textContent = total + ' 位 AI';
     const acknowledged = Object.values(current.votes).filter(vote => vote === '无异议，可执行').length;
     $('#verdict').textContent = archive ? '首轮已完成' : preview ? '方案修订回放' : !live ? '历史讨论' :
       current.done ? '全员确认，可执行' : received < total ? '独立提案 · ' + received + ' / ' + total :
       '评审 v' + current.revision + ' · ' + acknowledged + ' / ' + total + ' 已确认';
 
-    const messages = [message('user', '你', preview ? '刷新后怎么继续上一次讨论？请确定页面应该恢复哪些内容。' : run.title)];
+    const messages = [
+      message('user', '需求', preview ? '刷新后怎么继续上一次讨论？请确定页面应该恢复哪些内容。' : run.title),
+      elem('div', 'stage', '独立提案')
+    ];
     run.models.slice(0, received).forEach((name, i) => {
       messages.push(message('assistant', name, archive ? prior.summaries[i] : agents[name][1]));
     });
@@ -168,13 +171,15 @@ function render() {
     if (preview || (live && received === total)) {
       for (let n = 1; n <= lastRevision; n++) {
         const review = n === lastRevision && !preview ? current : demoReview(run.models, endOfReview(n));
-        const divider = elem('div', 'stage', n === 1 ? '交叉审查 · v1' : '修订方案 · v' + n);
+        const divider = elem('div', 'stage', '方案评审 · v' + n);
         messages.push(divider);
         if (n > 1) messages.push(elem('p', 'change', acceptance));
         for (const [name, vote] of Object.entries(review.votes)) {
-          messages.push(message('assistant', name, vote === '无异议，可执行' ? '当前方案没有歧义，可以按这版执行。' : objection, n));
+          const approved = vote === '无异议，可执行';
+          messages.push(message('assistant', name, approved ? '当前方案没有歧义，可以按这版执行。' : objection,
+            (approved ? '已确认' : '有异议') + ' · v' + n));
         }
-        if (review.done) messages.push(elem('div', 'stage', '讨论结束 · 全员已确认 v' + n));
+        if (review.done) messages.push(elem('div', 'stage', '评审结束 · 全员已确认 v' + n));
       }
     }
     if (live && !current.done) {
@@ -261,5 +266,65 @@ $('#compose').onsubmit = event => {
   showView(false);
   render();
 };
+function drawHero() {
+  const canvas = $('#heroArt');
+  const context = canvas.getContext('2d');
+  if (!context) return;
+
+  function fill(color, x, y, width, height) {
+    context.fillStyle = color;
+    context.fillRect(x, y, width, height);
+  }
+
+  function panel(x, y, width, height, border) {
+    fill(border, x + 1, y, width - 2, height);
+    fill(border, x, y + 1, width, height - 2);
+    fill('#141414', x + 1, y + 1, width - 2, height - 2);
+  }
+
+  // Keep the field quiet behind the title and brighten the proposal paths on the right.
+  for (let y = 2; y < canvas.height; y += 3) {
+    for (let x = 2; x < canvas.width; x += 3) {
+      const signal = Math.sin(x / 12 + y / 8) + Math.cos(y / 12 - x / 16);
+      const intensity = Math.min(1, Math.max(0, (x - 82) / 23));
+      const shade = Math.round(16 + intensity * (7 + (signal + 2) * 7));
+      fill(`rgb(${shade} ${shade} ${shade})`, x, y, 1, 1);
+    }
+  }
+
+  const symbols = [
+    ['100', '010', '001', '010', '100'],
+    ['00100', '00100', '11111', '00100', '00100'],
+    ['00100', '01110', '11111', '01110', '00100'],
+    ['10101', '01110', '11111', '01110', '10101']
+  ];
+  [25, 48, 71, 94].forEach((y, index) => {
+    fill('#535353', 136, y + 8, 20, 1);
+    fill('#9c9c9c', 141 + index * 2, y + 8, 3, 1);
+    panel(109, y, 28, 17, '#6a6a6a');
+    symbols[index].forEach((row, dy) => {
+      [...row].forEach((pixel, dx) => {
+        if (pixel === '1') fill('#eaeaea', 113 + dx, y + 6 + dy, 1, 1);
+      });
+    });
+    fill('#ababab', 122, y + 6, 10, 1);
+    fill('#555', 122, y + 10, 6 + index, 1);
+  });
+
+  fill('#727272', 155, 33, 1, 70);
+  fill('#898989', 155, 67, 15, 1);
+  [33, 56, 79, 102].forEach(y => fill('#d0d0d0', 154, y - 1, 3, 3));
+  fill('#eaeaea', 154, 66, 3, 3);
+  fill('#777', 166, 66, 2, 3);
+  panel(170, 52, 25, 32, '#eaeaea');
+  fill('#dadada', 175, 58, 14, 2);
+  [64, 67, 70].forEach(y => fill('#777', 175, y, 11, 1));
+  fill('#ddd', 178, 75, 2, 2);
+  fill('#ddd', 180, 77, 2, 2);
+  fill('#ddd', 182, 75, 2, 2);
+  fill('#ddd', 184, 73, 2, 2);
+}
+
+drawHero();
 updateConfig();
 render();
