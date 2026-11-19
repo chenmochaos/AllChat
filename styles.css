@@ -22,7 +22,7 @@
   --line: #1a1a1a;
   --strong-line: #7a7a7a;
   --bubble: #1a1a1a;
-  --hero-bg: #070707;
+  --hero-bg: #000;
   --brand-gray: #8d8d8d;
   --mono: "JetBrains Mono", "Noto Sans CJK SC", "Microsoft YaHei", monospace;
   color: var(--ink);
