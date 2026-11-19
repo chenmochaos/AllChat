@@ -3,96 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f7f6">
-  <title>AllChat · 模型协作台</title>
+  <title>AllChat · 讨论工作台</title>
   <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="rail" aria-label="主导航">
-      <a class="brand-mark" href="#" aria-label="AllChat 首页">A<span>.</span></a>
-      <button class="rail-button active" title="工作台" aria-label="工作台"><span class="icon-grid"></span></button>
-      <button class="rail-button" title="历史任务" aria-label="历史任务"><span class="icon-clock"></span></button>
-      <button class="rail-button" title="模型设置" aria-label="模型设置"><span class="icon-sliders"></span></button>
-      <div class="rail-spacer"></div>
-      <div class="avatar" title="本地演示">M</div>
-    </aside>
-
-    <main class="main-area">
-      <header class="topbar">
-        <div class="crumbs"><span>工作区</span><span class="crumb-sep">/</span><strong>新建讨论</strong></div>
-        <div class="top-actions"><span class="local-indicator"><i></i> 本地演示</span><button class="icon-action" title="更多选项" aria-label="更多选项">···</button></div>
-      </header>
-
-      <div class="workspace">
-        <section class="task-section" aria-labelledby="page-title">
-          <div class="section-heading">
-            <div><div class="eyebrow">MODEL COUNCIL <span>·</span> DEMO</div><h1 id="page-title">把复杂问题交给一组模型</h1></div>
-            <button class="text-button" id="reset-button" type="button">重置演示</button>
-          </div>
-          <div class="task-panel">
-            <label class="field-label" for="task-input">这次要解决什么？</label>
-            <textarea id="task-input" rows="3" placeholder="描述你的目标、遇到的问题和约束…">为现有 Web 应用设计一套多模型协作开发流程，支持并行规划、交叉审查、有限轮次收敛，并由快速模型执行。</textarea>
-            <div class="task-footer">
-              <div class="roster" aria-label="参与规划的模型">
-                <span class="field-label">规划席位</span>
-                <label class="model-toggle"><input type="checkbox" value="gpt" checked><span class="model-dot gpt">G</span><span>GPT-6.2 Astra</span></label>
-                <label class="model-toggle"><input type="checkbox" value="claude" checked><span class="model-dot claude">C</span><span>Claude</span></label>
-                <label class="model-toggle"><input type="checkbox" value="gemini" checked><span class="model-dot gemini">✦</span><span>Gemini</span></label>
-                <label class="model-toggle"><input type="checkbox" value="deepseek"><span class="model-dot deepseek">D</span><span>DeepSeek</span></label>
-              </div>
-              <button class="primary-button" id="start-button" type="button"><span class="spark-icon">✳</span> 开始方案讨论 <span class="button-arrow">→</span></button>
-            </div>
-            <div class="demo-note"><span class="info-icon">i</span> 演示模式：以下模型回复为预置示例，不会调用真实模型或修改项目文件。</div>
-          </div>
-        </section>
-
-        <section class="flow-section" aria-label="讨论流程">
-          <div class="flow-header">
-            <div class="flow-tabs" role="tablist">
-              <button class="flow-tab selected" type="button" data-tab="discussion">讨论过程 <span class="tab-count" id="round-count">0</span></button>
-              <button class="flow-tab" type="button" data-tab="final">最终方案</button>
-            </div>
-            <div class="round-control"><span>最多轮数</span><select id="max-rounds" aria-label="最多讨论轮数"><option value="2">2 轮</option><option value="3" selected>3 轮</option><option value="4">4 轮</option></select></div>
-          </div>
-
-          <div class="empty-state" id="empty-state">
-            <div class="empty-graphic"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="empty-core">A</span><span class="orbit-node node-a">G</span><span class="orbit-node node-b">C</span><span class="orbit-node node-c">✦</span></div>
-            <h2>先让每个模型独立思考</h2>
-            <p>模型会先各自给出方案，再互相找漏洞。BOSS 汇总共识、保留分歧，并控制讨论轮次。</p>
-            <div class="flow-steps"><span><b>01</b> 独立方案</span><i></i><span><b>02</b> 交叉审查</span><i></i><span><b>03</b> BOSS 修订</span></div>
-          </div>
-
-          <div class="discussion hidden" id="discussion-view">
-            <div class="round-banner"><div class="round-index">R<span id="current-round">1</span></div><div class="round-copy"><strong id="round-title">第一轮 · 独立方案</strong><span id="round-subtitle">各模型先独立回答，暂不互相查看</span></div><span class="status-pill running" id="phase-status">演示完成</span></div>
-            <div class="proposal-grid" id="proposal-grid"></div>
-            <div class="review-strip"><div class="review-strip-head"><span class="review-glyph">↗</span><strong>交叉审查</strong><span>独立提案完成后互相找漏洞</span></div><div class="review-items" id="review-items"></div></div>
-            <article class="boss-panel">
-              <div class="boss-heading"><div class="boss-avatar">B</div><div><div class="boss-title">BOSS 综合判断 <span class="boss-tag">主持人</span></div><span class="boss-meta">整合重复观点，标出冲突与待验证假设</span></div><span class="consensus-badge" id="consensus-badge"><i></i> 部分收敛</span></div>
-              <div class="boss-body" id="boss-body"></div>
-              <div class="disagreement-row" id="disagreement-row"><span class="disagreement-icon">!</span><div><strong>仍待决定</strong><span id="disagreement-text">要不要现在就把真实模型 API 接入执行闭环？</span></div><button class="resolve-button" id="resolve-button" type="button">我来决定 <span>→</span></button></div>
-              <div class="boss-footer"><span id="boss-round-meta">第 1 / 3 轮 · 还有 2 轮修订机会</span><button class="secondary-button" id="revise-button" type="button">进入下一轮 <span>→</span></button></div>
-            </article>
-            <div class="round-complete hidden" id="round-complete"><span class="complete-mark">✓</span><div><strong>已达到轮数上限</strong><span>未解决的分歧会保留在最终方案中，由你决定。</span></div><button class="secondary-button" id="finalize-button" type="button">整理最终方案 <span>→</span></button></div>
-          </div>
-
-          <div class="final-view hidden" id="final-view">
-            <div class="final-heading"><div><div class="eyebrow">BOSS SYNTHESIS <span>·</span> 第 <b id="final-round-number">2</b> 轮后</div><h2>方案已整理，等待你确认</h2></div><span class="status-pill pending">待你确认</span></div>
-            <article class="final-plan">
-              <div class="plan-section"><div class="plan-number">01</div><div><h3>工作流</h3><p>同一任务上下文并行发给所选模型，各自输出结构化方案。所有提案完成后，再开放给其他模型交叉审查。</p></div></div>
-              <div class="plan-section"><div class="plan-number">02</div><div><h3>BOSS 负责收敛，不替你拍板</h3><p>合并一致观点，逐项处理审查意见。保留仍有证据分歧的决策点，并给出双方理由。达到轮数上限后停止讨论。</p></div></div>
-              <div class="plan-section"><div class="plan-number">03</div><div><h3>确认后交给执行模型</h3><p>将确认后的方案、项目上下文和验证要求交给 GPT-6.1 Sol 执行。完成后由不同模型并行审查变更和测试结果。</p></div></div>
-              <div class="final-disagreement"><span>保留分歧</span><p>首版原型应先验证多模型讨论体验，还是先完成 CLI / API 真实接入？建议先验证流程体验；接入方式由用户下一步选择。</p></div>
-            </article>
-            <div class="confirm-bar"><div><strong>交接对象</strong><span><b class="model-dot gpt">G</b> GPT-6.1 Sol <small>· 执行模型</small></span></div><button class="primary-button" id="confirm-button" type="button"><span class="check-icon">✓</span> 确认方案并生成交接</button></div>
-            <div class="handoff-panel hidden" id="handoff-panel"><div class="handoff-head"><div><span class="success-dot"></span><strong>执行交接已准备好</strong><small>演示状态 · 未调用真实模型</small></div><button class="copy-button" id="copy-button" type="button">复制交接内容</button></div><pre id="handoff-text"></pre><span class="copy-feedback" id="copy-feedback" aria-live="polite"></span></div>
-          </div>
-        </section>
-      </div>
-      <footer class="app-footer"><span>AllChat <span class="footer-sep">/</span> Local prototype</span><span>概念验证 <i></i> 不会发送项目内容</span></footer>
-    </main>
-  </div>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <header><div class="top"><a class="brand" href="./index.html"><i class="brandmark" aria-hidden="true"></i>AllChat</a><span class="project">/　工作区</span><button class="quiet history" id="history">历史记录</button></div></header>
+  <main>
+    <section aria-labelledby="composeTitle">
+      <div class="meta"><i class="dot"></i> 本地工作区 <span class="slash">/</span> AllChat</div>
+      <h1 id="composeTitle">发起讨论</h1>
+      <form id="compose">
+        <textarea id="task" aria-label="讨论需求" placeholder="这次想和模型们一起解决什么问题？" maxlength="2000" required></textarea>
+        <div class="tools"><button type="button" class="quiet config" id="config"><span class="duo" aria-hidden="true"><b>›</b><b>✳</b></span><span id="modelLabel">Codex + Claude</span> ﹀</button><button class="primary" type="submit">开始讨论 <b>↑</b></button></div>
+      </form>
+      <div class="caption"><span class="tiny-dot"></span> 交互演示 · 新讨论使用示例回复</div>
+    </section>
+    <section class="result" aria-labelledby="runTitle">
+      <div class="section-label"><span id="source"></span><span class="rule"></span><span id="when"></span></div>
+      <h2 id="runTitle"></h2><p class="summary" id="summary" aria-live="polite"></p>
+      <div id="rows"></div><div id="next"></div>
+    </section>
+  </main>
+  <dialog id="panel"><div class="dialog-head"><h2 id="panelTitle"></h2><button class="close" aria-label="关闭" id="close">×</button></div><div id="panelBody"></div></dialog>
 </body>
 </html>
