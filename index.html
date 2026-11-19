@@ -1,31 +1,50 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AllChat · 方案评审</title><link rel="stylesheet" href="styles.css"><script defer src="app.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AllChat · 群聊工作区</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
 </head>
 <body>
-<header><div class="top"><a href="./index.html" class="brand"><i class="brand-mark" aria-hidden="true"></i>AllChat</a><span class="workspace">工作区</span><nav><button id="history">历史记录</button><button class="primary" id="new">＋ 新讨论</button></nav></div></header>
-<main>
-  <div class="titleblock"><div class="context"><b id="source">交互示例</b><span id="summary"></span></div><h1 id="runTitle"></h1></div>
-  <section class="room" aria-label="讨论成员">
-    <div class="room-head"><strong>讨论成员</strong><span id="verdict" aria-live="polite"></span></div>
-    <div id="rows"></div>
-    <div id="voice" aria-live="polite"></div>
-  </section>
-  <div class="layout">
-    <div class="reader">
-      <div class="bar"><strong>方案正文</strong><div id="versions" aria-label="方案版本"></div></div>
-      <article>
-        <h2 id="topic"></h2><p id="lead"></p>
-        <div class="passage"><h3>验收条件</h3><div id="clause"></div></div>
-        <aside id="annotation" hidden><strong id="annotator"></strong><p>刷新时如果一个模型还没返回，已完成的提案会保留吗？这里需要写清恢复条件。</p></aside>
-      </article>
-      <div id="next"></div>
+  <header class="topbar">
+    <div class="top">
+      <a href="./index.html" class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>AllChat</a>
+      <nav aria-label="工作区">
+        <button id="history" class="quiet">历史记录</button>
+      </nav>
     </div>
-  </div>
-</main>
-<dialog id="composer" aria-labelledby="composeTitle"><div class="dialog-head"><h2 id="composeTitle">新讨论</h2><button type="button" class="close" aria-label="关闭新讨论" onclick="this.closest('dialog').close()">×</button></div>
-<form id="compose"><textarea id="task" maxlength="2000" required placeholder="写下这次要解决的问题…" aria-label="讨论需求"></textarea><div class="tools"><button type="button" class="quiet" id="config"><span id="modelLabel"></span> ﹀</button><button class="primary" type="submit">开始讨论 ↑</button></div><p class="small">本地演示 · 使用示例回复</p></form></dialog>
-<dialog id="panel" aria-labelledby="panelTitle"><div class="dialog-head"><h2 id="panelTitle"></h2><button class="close" aria-label="关闭" id="close">×</button></div><div id="panelBody"></div></dialog>
-</body></html>
+  </header>
+  <main>
+    <section class="chat" aria-labelledby="runTitle">
+      <div class="chat-head">
+        <div class="chat-title">
+          <div class="context"><span id="source">示例讨论</span><span class="context-dot">·</span><span id="verdict" aria-live="polite"></span></div>
+          <h1 id="runTitle"></h1>
+        </div>
+      </div>
+      <div class="room-head"><strong>成员</strong><span id="memberCount"></span></div>
+      <div id="members" aria-label="讨论成员"></div>
+      <div class="view-tabs" aria-label="查看内容"><button type="button" id="showChat" aria-pressed="true">群聊</button><button type="button" id="showPlan" aria-pressed="false">方案 <span id="versions"></span></button></div>
+      <div id="conversation" class="viewport" role="log" aria-label="讨论消息" tabindex="0"></div>
+      <div id="plan" class="viewport plan" aria-label="方案正文" hidden>
+        <div id="planBody"></div>
+      </div>
+      <div id="handoff" hidden></div>
+      <form id="compose">
+        <button type="button" class="icon-button model-picker" id="config" aria-label="选择参会模型" title="选择参会模型">
+          <span id="composeModels" aria-hidden="true"></span><span class="caret" aria-hidden="true">⌄</span>
+        </button>
+        <textarea id="task" rows="1" maxlength="2000" required placeholder="写下一个问题，邀请 AI 一起讨论…" aria-label="新讨论的主题"></textarea>
+        <button class="send" type="submit" aria-label="开始讨论" title="开始讨论">↑</button>
+      </form>
+      <p class="demo-note">本地交互演示 · 回复为示例内容</p>
+    </section>
+  </main>
+<dialog id="panel" aria-labelledby="panelTitle">
+    <div class="dialog-head"><h2 id="panelTitle"></h2><button class="icon-button close" type="button" aria-label="关闭" id="close">×</button></div>
+    <div id="panelBody"></div>
+  </dialog>
+</body>
+</html>

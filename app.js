@@ -1,9 +1,11 @@
 const $ = selector => document.querySelector(selector);
+const proposalDelay = 600;
+const reviewDelay = 650;
 const agents = {
-  Codex: ['›_', '先按任务拆分，给每一步写明验收条件，再交给执行模型。'],
-  Claude: ['✳', '把关键假设和失败场景单列，保留需要人工决定的取舍。'],
-  Gemini: ['✧', '用一条最小流程先验证方案，再逐步扩展。'],
-  DeepSeek: ['≈', '先实现高频路径，用现有检查验证结果。']
+  Codex: ['›_', '每位模型的提案单独保存。先完成的可以直接读，别让整个讨论等最慢的一位。'],
+  Claude: ['✳', '先定义刷新时要恢复的状态。正在生成、已完成和失败都应该分开显示。'],
+  Gemini: ['✧', '可以给每次讨论一个固定标识，刷新后从同一条记录读回已有的提案。'],
+  DeepSeek: ['≈', '加一个部分失败的用例：一位模型失败时，其他模型已交的提案仍能打开。']
 };
 const prior = {
   id: 'sample', title: '双模型提案页如何处理部分失败？', models: ['Codex', 'Claude'],
@@ -11,7 +13,7 @@ const prior = {
 };
 const example = {id:'annotated-example', title:'中断后，如何继续一次讨论？', models:['Codex','Gemini','DeepSeek','Claude']};
 const key = 'allchat.workspace.v1';
-let workspace = {models: prior.models, runs: [], active: example.id};
+let workspace = {models: example.models, runs: [], active: example.id};
 try {
   const saved = JSON.parse(localStorage.getItem(key));
   if (saved && Array.isArray(saved.runs) && Array.isArray(saved.models)) workspace = saved;
@@ -33,7 +35,7 @@ function button(label, action, cls = 'primary') {
 }
 function portrait(name) {
   const image = elem('img', 'portrait');
-  image.src = 'assets/avatars/' + name.toLowerCase() + '.png';
+  image.src = 'assets/icons/' + name.toLowerCase() + '.svg';
   image.alt = '';
   return image;
 }
@@ -44,7 +46,10 @@ function openPanel(title) {
   return $('#panelBody');
 }
 $('#close').onclick = () => $('#panel').close();
-function updateConfig() { $('#modelLabel').textContent = workspace.models.join(' + '); }
+function updateConfig() {
+  $('#composeModels').replaceChildren(...workspace.models.map(portrait));
+  $('#config').title = '参会模型：' + workspace.models.join('、');
+}
 $('#config').onclick = () => {
   const body = openPanel('讨论设置');
   const checks = Object.keys(agents).map(name => {
@@ -68,7 +73,7 @@ $('#history').onclick = () => {
   const body = openPanel('历史记录');
   for (const run of [...workspace.runs, example, prior]) {
     body.append(button(run.title, () => {
-      workspace.active = run.id; revisionChoice = null; save(); $('#panel').close(); render();
+      workspace.active = run.id; revisionChoice = null; save(); $('#panel').close(); showView(false); render();
     }, 'entry'));
   }
 };
@@ -78,7 +83,7 @@ let timer;
 function demoReview(models, elapsed) {
   const votes = {};
   let revision = 1;
-  let arrived = Math.max(0, Math.floor((elapsed - models.length * 450) / 400));
+  let arrived = Math.max(0, Math.floor((elapsed - models.length * proposalDelay) / reviewDelay));
   for (const version of [1, 2]) {
     if (!arrived) break;
     revision = version;
@@ -92,94 +97,169 @@ function demoReview(models, elapsed) {
   return {revision, votes, done: models.every(model => votes[model] === '无异议，可执行')};
 }
 let revisionChoice = null;
-let selectedMember;
-$('#new').onclick = () => { $('#composer').showModal(); $('#task').focus(); };
+let displayedRun;
+const conversation = $('#conversation');
+const acceptance = '刷新后，已完成的提案仍可打开；未完成的参与者各自保留原状态。';
+const objection = '如果刷新时还有模型没返回，已经提交的提案会保留吗？需要把这个场景写进验收条件。';
+
+function showView(plan) {
+  $('#plan').hidden = !plan;
+  conversation.hidden = plan;
+  $('#showChat').setAttribute('aria-pressed', String(!plan));
+  $('#showPlan').setAttribute('aria-pressed', String(plan));
+}
+$('#showChat').onclick = () => showView(false);
+$('#showPlan').onclick = () => showView(true);
+
+function message(kind, author, text, version = 0) {
+  const item = elem('div', 'message ' + kind);
+  const content = elem('div', 'message-content');
+  const name = elem('div', 'message-name', author);
+  if (kind === 'assistant') {
+    const avatar = elem('span', 'avatar');
+    avatar.append(portrait(author));
+    item.append(avatar);
+    item.dataset.author = author;
+    item.tabIndex = -1;
+  }
+  if (version) name.append(elem('span', 'message-version', 'v' + version));
+  content.append(name, elem('p', 'bubble', text));
+  item.append(content);
+  return item;
+}
+
 function render() {
   clearTimeout(timer);
   const run = [...workspace.runs, prior].find(item => item.id === workspace.active) || example;
   const archive = run.id === prior.id;
   const preview = run.id === example.id;
-  const live = !archive && !preview && run.consensusDemo;
-  const elapsed = Math.max(0, Date.now() - (run.started || Date.now()));
+  const live = !archive && !preview && Boolean(run.consensusDemo);
   const total = run.models.length;
-  const received = live ? Math.min(total, Math.floor(elapsed / 450)) : total;
-  const latest = demoReview(run.models, elapsed);
-  const available = preview ? 2 : live ? latest.revision : 1;
-  const version = Math.min(revisionChoice || (preview ? 1 : available), available);
-  const ballot = preview || (live && version < available) ?
-    demoReview(run.models, total * 450 + total * 400 * version) : latest;
-  const votes = live || preview ? ballot.votes : {};
-  const critic = run.models.find(name => votes[name] && votes[name] !== '无异议，可执行');
-  const confirmed = (live || preview) && ballot.done;
-  const view = [run.id, received, version, available, ...Object.values(votes), run.handoff].join('|');
-  if (view !== lastView) {
-    const sameRun = lastView.split('|')[0] === run.id;
-    if (!sameRun) selectedMember = critic || run.models[0];
-    const focused = $('#rows').contains(document.activeElement) ? document.activeElement.dataset.name : null;
-    lastView = view;
+  const elapsed = live ? Math.max(0, Date.now() - run.started) : 0;
+  const received = live ? Math.min(total, Math.floor(elapsed / proposalDelay)) : total;
+  const endOfReview = version => total * (proposalDelay + reviewDelay * version);
+  const current = demoReview(run.models, preview ? endOfReview(1) : elapsed);
+  const available = preview ? 2 : current.revision;
+  const version = Math.min(revisionChoice || current.revision, available);
+  const ballot = preview || version < current.revision ? demoReview(run.models, endOfReview(version)) : current;
+  const stateKey = JSON.stringify([run.id, received, current, version, run.handoff]);
+
+  if (stateKey !== lastView) {
+    const changedRun = displayedRun !== run.id;
+    const nearEnd = !conversation.hidden && conversation.scrollHeight - conversation.clientHeight - conversation.scrollTop < 70;
+    const focusedMember = $('#members').contains(document.activeElement) ? document.activeElement.dataset.name : '';
+    displayedRun = run.id;
+    lastView = stateKey;
+
     $('#runTitle').textContent = run.title;
-    $('#source').textContent = archive ? '实测归档' : preview ? '批注示例' : '本地演示';
-    $('#summary').textContent = archive ? '2026.11.19' : preview ? '方案修订回放' : '模拟讨论';
-    const versions = $('#versions'); versions.replaceChildren();
-    for (let n = 1; n <= available; n++) {
-      const tab = button('v' + n, () => { revisionChoice = n === available ? null : n; if (preview) revisionChoice = n; render(); }, 'version');
-      tab.setAttribute('aria-pressed', String(n === version)); versions.append(tab);
-    }
-    $('#topic').textContent = archive ? '独立保存每个模型的提案' : '按模型保存讨论进度';
-    $('#lead').textContent = '每份提案独立保存。先完成的方案可以立即阅读，其他模型继续生成。';
-    const clause = $('#clause'); clause.replaceChildren();
-    const annotation = $('#annotation');
-    annotation.hidden = !critic;
-    if (critic) {
-      const mark = button('重新打开页面后，恢复上一次讨论。', () => {
-        annotation.hidden = !annotation.hidden;
-        mark.setAttribute('aria-expanded', String(!annotation.hidden));
-      }, 'ink');
-      mark.setAttribute('aria-controls','annotation'); mark.setAttribute('aria-expanded','true');
-      clause.append(mark);
-      $('#annotator').textContent = critic + '　/　异议';
-    } else {
-      clause.textContent = version === 2 || archive ? '重新打开页面后，已完成的提案仍可阅读，未完成的模型保留各自的状态。' : '重新打开页面后，恢复上一次讨论。';
-    }
-    $('#verdict').textContent = archive ? '首轮实测 · 2 份提案' : !preview && !live ? '旧版演示记录' :
-      received < total ? '独立提案 · ' + received + ' / ' + total : confirmed ? '全员确认可执行' : '交叉审查 · v' + version;
-    const rows = $('#rows'); rows.replaceChildren();
-    const insights = new Map();
-    function selectMember(name) {
-      selectedMember = name;
-      for (const member of rows.children) member.setAttribute('aria-pressed', String(member.dataset.name === name));
-      const voice = $('#voice');
-      voice.replaceChildren(elem('b','speaker',name), elem('span','opinion',insights.get(name)));
-      voice.classList.toggle('objection', name === critic);
-    }
-    run.models.forEach((name,index) => {
-      const item = button('', () => selectMember(name), 'member');
-      item.dataset.name = name;
-      const state = archive ? ['1 分 41 秒','4 分 33 秒'][index] : name === critic ? '有异议' : votes[name] ? '已确认' : received > index ? '已提案' : '准备中';
-      item.append(portrait(name), elem('b','agent',name), elem('span', name === critic ? 'issue' : 'state',state));
-      item.classList.toggle('thinking', live && received <= index);
-      insights.set(name, name === critic ? '需要补充恢复条件：刷新时如何保留已经完成的提案？' :
-        archive ? prior.summaries[index] : confirmed ? '已确认当前版本无异议，可以执行。' : received > index ? agents[name][1] : '等待提案。');
-      rows.append(item);
+    $('#source').textContent = archive ? '实测归档' : preview ? '示例讨论' : '本地演示';
+    $('#memberCount').textContent = total + ' 位 AI';
+    const acknowledged = Object.values(current.votes).filter(vote => vote === '无异议，可执行').length;
+    $('#verdict').textContent = archive ? '首轮已完成' : preview ? '方案修订回放' : !live ? '历史讨论' :
+      current.done ? '全员确认，可执行' : received < total ? '独立提案 · ' + received + ' / ' + total :
+      '评审 v' + current.revision + ' · ' + acknowledged + ' / ' + total + ' 已确认';
+
+    const messages = [message('user', '你', preview ? '刷新后怎么继续上一次讨论？请确定页面应该恢复哪些内容。' : run.title)];
+    run.models.slice(0, received).forEach((name, i) => {
+      messages.push(message('assistant', name, archive ? prior.summaries[i] : agents[name][1]));
     });
-    selectMember(selectedMember);
-    if (focused) [...rows.children].find(member => member.dataset.name === focused)?.focus({preventScroll:true});
-    const next = $('#next'); next.replaceChildren();
-    if (run.choice) next.append(elem('p','small','历史决策 · ' + run.choice));
-    if (confirmed || run.handoff) {
-      if (run.handoff) next.append(elem('p','small','执行交接草稿 · DeepSeek　/　' + run.title));
-      else if (!preview) next.append(button('生成执行交接', () => { run.handoff = true; save(); render(); }));
+
+    const lastRevision = preview ? version : current.revision;
+    if (preview || (live && received === total)) {
+      for (let n = 1; n <= lastRevision; n++) {
+        const review = n === lastRevision && !preview ? current : demoReview(run.models, endOfReview(n));
+        const divider = elem('div', 'stage', n === 1 ? '交叉审查 · v1' : '修订方案 · v' + n);
+        messages.push(divider);
+        if (n > 1) messages.push(elem('p', 'change', acceptance));
+        for (const [name, vote] of Object.entries(review.votes)) {
+          messages.push(message('assistant', name, vote === '无异议，可执行' ? '当前方案没有歧义，可以按这版执行。' : objection, n));
+        }
+        if (review.done) messages.push(elem('div', 'stage', '讨论结束 · 全员已确认 v' + n));
+      }
     }
+    if (live && !current.done) {
+      const waiting = run.models.find((name, index) => received < total ? index >= received : !current.votes[name]);
+      const typing = elem('p', 'typing', waiting ? waiting + ' 正在' + (received < total ? '拟定提案' : '审查方案') : '正在修订方案');
+      const dots = elem('span', 'dots');
+      dots.setAttribute('aria-hidden', 'true');
+      dots.append(elem('i'), elem('i'), elem('i'));
+      typing.append(dots);
+      messages.push(typing);
+    }
+
+    const keep = changedRun ? 0 : [...conversation.children].findIndex((node, i) => !messages[i] || !node.isEqualNode(messages[i]));
+    const firstChange = keep < 0 ? conversation.children.length : keep;
+    while (conversation.children.length > firstChange) conversation.lastElementChild.remove();
+    conversation.append(...messages.slice(firstChange));
+
+    const members = run.models.map(name => {
+      const member = button('', () => {
+        showView(false);
+        const last = [...conversation.querySelectorAll('[data-author]')].findLast(item => item.dataset.author === name);
+        if (!last) return;
+        last.scrollIntoView({block:'nearest', behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+        last.focus({preventScroll:true});
+      }, 'member');
+      member.dataset.name = name;
+      member.append(portrait(name), elem('span', '', name));
+      return member;
+    });
+    $('#members').replaceChildren(...members);
+    if (focusedMember) members.find(member => member.dataset.name === focusedMember)?.focus({preventScroll:true});
+
+    $('#versions').textContent = available > 1 ? '· v' + version : '';
+    const planBody = $('#planBody');
+    const versionRow = elem('div', 'switch');
+    for (let n = 1; n <= available; n++) {
+      const tab = button('v' + n, () => {
+        revisionChoice = n;
+        render();
+        $('#planBody .switch [aria-pressed="true"]')?.focus({preventScroll:true});
+      }, 'version');
+      tab.setAttribute('aria-pressed', String(n === version));
+      versionRow.append(tab);
+    }
+    const title = elem('div','plan-head');
+    title.append(elem('h2','','方案正文'), versionRow);
+    planBody.replaceChildren(title);
+    if (archive || (!preview && !live)) {
+      planBody.append(elem('p','','这次记录包含独立提案。'));
+    } else if (received < total) {
+      planBody.append(elem('p','','正在收集独立提案。'));
+    } else {
+      planBody.append(elem('h3','','按模型恢复讨论状态'), elem('p','','分别保存每位模型的提案和进度，刷新时按讨论记录加载。'),
+        elem('h3','','验收条件'), elem('p','',version === 1 ? '重新打开页面后，恢复上一次讨论。' : acceptance));
+      if (Object.values(ballot.votes).some(vote => vote !== '无异议，可执行')) planBody.append(elem('p','plan-status','待解决 · ' + objection));
+      if (ballot.done) planBody.append(elem('p','plan-status','已确认 · ' + total + ' 位模型同意 v' + version + ' 可执行'));
+    }
+
+    const handoff = $('#handoff');
+    const ready = live && current.done;
+    handoff.hidden = !ready && !run.handoff;
+    handoff.replaceChildren();
+    if (run.handoff) handoff.append(elem('p','','执行交接草稿 · DeepSeek'));
+    else if (ready) handoff.append(elem('span','','最终方案 v' + current.revision), button('生成执行交接', () => {
+      run.handoff = true; save(); render();
+    }));
+    if (changedRun) conversation.scrollTop = 0;
+    else if (live && nearEnd) conversation.scrollTop = conversation.scrollHeight;
   }
-  if (live && !latest.done) timer = setTimeout(render,250);
+  if (live && !current.done) timer = setTimeout(render, 150);
 }
+
 $('#compose').onsubmit = event => {
   event.preventDefault();
   const title = $('#task').value.trim();
   if (!title) { $('#task').focus(); return; }
-  const run = {id: String(Date.now()), started: Date.now(), title, models: [...workspace.models], consensusDemo: true};
-  revisionChoice = null; $('#composer').close(); workspace.runs.unshift(run); workspace.active = run.id; save(); $('#task').value = ''; render();
-  $('#runTitle').scrollIntoView({block:'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  const now = Date.now();
+  const run = {id: String(now), started: now, title, models: [...workspace.models], consensusDemo: true};
+  revisionChoice = null;
+  workspace.runs.unshift(run);
+  workspace.active = run.id;
+  save();
+  $('#task').value = '';
+  showView(false);
+  render();
 };
 updateConfig();
 render();

@@ -16,6 +16,7 @@ AllChat is a local-first prototype for coordinating multiple AI models through a
 
 - Keep the first prototype in a small number of root-level files (`index.html`, `styles.css`, `app.js`).
 - Store the four original participant portraits as local PNGs in `assets/avatars/`, named after their lowercase model family. Replace a portrait in place when its design changes.
+- Use local monochrome model marks from Lobe Icons in `assets/icons/` for the chat. Name them after the upstream icon IDs. The original portraits are kept as historical assets.
 - Use descriptive English names for files, variables, and UI data identifiers.
 - Do not add generated output or unrelated project documentation.
 
