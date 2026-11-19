@@ -8,7 +8,7 @@ AllChat is a local-first prototype for coordinating multiple AI models through a
 
 - The first version is a clickable UI prototype with clearly labeled demo data.
 - Do not imply that real model providers are connected or that agents have executed code.
-- Keep the workflow legible: proposals, disagreements, consensus status, round limit, and execution handoff should be visible.
+- Show proposals, open objections, approvals for the current revision, and execution handoff. End discussion automatically once every participant explicitly confirms that the same revision has no unresolved ambiguity and can be implemented. A new revision requires fresh approvals from every participant.
 - No backend, provider credentials, database, or external service calls in this prototype.
 - Avoid adding dependencies unless the prototype cannot reasonably work without them.
 
