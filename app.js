@@ -266,65 +266,131 @@ $('#compose').onsubmit = event => {
   showView(false);
   render();
 };
-function drawHero() {
+function drawWordmark() {
+  const glyphs = {
+    A: ['0011100', '0111110', '1110111', '1100011', '1100011', '1111111', '1111111', '1100011', '1100011', '1100011'],
+    L: ['1100000', '1100000', '1100000', '1100000', '1100000', '1100000', '1100000', '1100000', '1111111', '0111111'],
+    C: ['0011110', '0111111', '1110000', '1100000', '1100000', '1100000', '1100000', '1110000', '0111111', '0011110'],
+    H: ['1100011', '1100011', '1100011', '1100011', '1111111', '1111111', '1100011', '1100011', '1100011', '1100011'],
+    T: ['1111111', '1111111', '0011100', '0011100', '0011100', '0011100', '0011100', '0011100', '0011100', '0011100']
+  };
+  const word = $('#heroTitle span').textContent.toUpperCase();
+  const canvas = $('#heroWordmark');
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  canvas.width = word.length * 9 - 1;
+  canvas.height = 11;
+  const bands = ['#d4d4d4', '#d4d4d4', '#d4d4d4', '#afafaf', '#8d8d8d',
+    '#8d8d8d', '#5a5a5a', '#5a5a5a', '#2f2f2f', '#2f2f2f'];
+
+  for (const [index, letter] of [...word].entries()) {
+    glyphs[letter].forEach((row, y) => {
+      context.fillStyle = '#2f2f2f';
+      [...row].forEach((pixel, x) => {
+        if (pixel === '1') context.fillRect(index * 9 + x + 1, y + 1, 1, 1);
+      });
+    });
+    glyphs[letter].forEach((row, y) => {
+      context.fillStyle = bands[y];
+      [...row].forEach((pixel, x) => {
+        if (pixel === '1') context.fillRect(index * 9 + x, y, 1, 1);
+      });
+    });
+  }
+  canvas.hidden = false;
+}
+
+function animateHero() {
   const canvas = $('#heroArt');
   const context = canvas.getContext('2d');
   if (!context) return;
 
-  function fill(color, x, y, width, height) {
-    context.fillStyle = color;
-    context.fillRect(x, y, width, height);
-  }
+  const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  const toggle = $('#heroMotion');
+  const shades = ['#202020', '#2f2f2f', '#2f2f2f', '#5a5a5a', '#5a5a5a', '#8d8d8d'];
+  let pixels = [];
+  let visible = false;
+  let paused = false;
+  let frame = 0;
+  let elapsed = 0;
+  let previousTime = 0;
 
-  function panel(x, y, width, height, border) {
-    fill(border, x + 1, y, width - 2, height);
-    fill(border, x, y + 1, width, height - 2);
-    fill('#141414', x + 1, y + 1, width - 2, height - 2);
-  }
-
-  // Keep the field quiet behind the title and brighten the proposal paths on the right.
-  for (let y = 2; y < canvas.height; y += 3) {
-    for (let x = 2; x < canvas.width; x += 3) {
-      const signal = Math.sin(x / 12 + y / 8) + Math.cos(y / 12 - x / 16);
-      const intensity = Math.min(1, Math.max(0, (x - 82) / 23));
-      const shade = Math.round(16 + intensity * (7 + (signal + 2) * 7));
-      fill(`rgb(${shade} ${shade} ${shade})`, x, y, 1, 1);
+  function draw(time) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    for (const pixel of pixels) {
+      const wave = Math.sin(pixel.phase + time + pixel.y / 51);
+      const shimmer = Math.cos(pixel.phase / 4 - time * 0.44 + pixel.x / 89);
+      const light = pixel.density * (wave * 0.54 + shimmer * 0.3 + 0.27);
+      if (light <= 0.16) continue;
+      context.fillStyle = shades[Math.min(shades.length - 1, Math.floor(light * 6))];
+      context.fillRect(pixel.x, pixel.y, pixel.size, pixel.size);
     }
   }
 
-  const symbols = [
-    ['100', '010', '001', '010', '100'],
-    ['00100', '00100', '11111', '00100', '00100'],
-    ['00100', '01110', '11111', '01110', '00100'],
-    ['10101', '01110', '11111', '01110', '10101']
-  ];
-  [25, 48, 71, 94].forEach((y, index) => {
-    fill('#535353', 136, y + 8, 20, 1);
-    fill('#9c9c9c', 141 + index * 2, y + 8, 3, 1);
-    panel(109, y, 28, 17, '#6a6a6a');
-    symbols[index].forEach((row, dy) => {
-      [...row].forEach((pixel, dx) => {
-        if (pixel === '1') fill('#eaeaea', 113 + dx, y + 6 + dy, 1, 1);
-      });
-    });
-    fill('#ababab', 122, y + 6, 10, 1);
-    fill('#555', 122, y + 10, 6 + index, 1);
-  });
+  function resize() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    pixels = [];
+    const spacing = Math.round(Math.max(13, Math.min(canvas.width / 86, 22)));
+    const columns = Math.ceil(canvas.width / spacing);
+    const rows = Math.ceil(canvas.height / spacing);
 
-  fill('#727272', 155, 33, 1, 70);
-  fill('#898989', 155, 67, 15, 1);
-  [33, 56, 79, 102].forEach(y => fill('#d0d0d0', 154, y - 1, 3, 3));
-  fill('#eaeaea', 154, 66, 3, 3);
-  fill('#777', 166, 66, 2, 3);
-  panel(170, 52, 25, 32, '#eaeaea');
-  fill('#dadada', 175, 58, 14, 2);
-  [64, 67, 70].forEach(y => fill('#777', 175, y, 11, 1));
-  fill('#ddd', 178, 75, 2, 2);
-  fill('#ddd', 180, 77, 2, 2);
-  fill('#ddd', 182, 75, 2, 2);
-  fill('#ddd', 184, 73, 2, 2);
+    // Concentrate the moving field along the edges so the heading stays legible.
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const x = (col + 0.5) / columns * 2 - 1;
+        const y = (row + 0.5) / rows * 2 - 1;
+        const corners = Math.abs(x) ** 2 * (0.23 + 0.77 * Math.abs(y) ** 2);
+        const density = Math.max(corners, Math.abs(y) ** 8 * 0.4);
+        if (density < 0.16) continue;
+        const seed = (col * 13 + row * 17 + col * row * 29) % 101;
+        pixels.push({x: col * spacing + 3, y: row * spacing + 3, size: Math.floor(spacing / 2),
+          phase: seed * 0.69, density});
+      }
+    }
+    draw(elapsed);
+  }
+
+  function tick(time) {
+    if (!previousTime) previousTime = time;
+    const delta = time - previousTime;
+    if (delta >= 72) {
+      elapsed += Math.min(delta, 150) / 1250;
+      previousTime = time;
+      draw(elapsed);
+    }
+    frame = requestAnimationFrame(tick);
+  }
+
+  function syncAnimation() {
+    const playing = visible && !document.hidden && !motion.matches && !paused;
+    if (playing && !frame) {
+      previousTime = 0;
+      frame = requestAnimationFrame(tick);
+    } else if (!playing && frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+
+    toggle.hidden = motion.matches;
+    const label = paused ? 'Resume background animation' : 'Pause background animation';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
+    toggle.firstElementChild.textContent = paused ? '▶' : 'Ⅱ';
+  }
+
+  toggle.onclick = () => { paused = !paused; syncAnimation(); };
+  motion.addEventListener('change', syncAnimation);
+  document.addEventListener('visibilitychange', syncAnimation);
+  new ResizeObserver(resize).observe(canvas);
+  new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    syncAnimation();
+  }).observe(canvas);
+  syncAnimation();
 }
 
-drawHero();
+drawWordmark();
+animateHero();
 updateConfig();
 render();

@@ -19,13 +19,15 @@
   </header>
   <main>
     <section class="home" aria-labelledby="heroTitle">
-      <canvas id="heroArt" width="208" height="136" aria-hidden="true"></canvas>
+      <canvas id="heroArt" aria-hidden="true"></canvas>
       <div class="hero-copy">
-        <h1 id="heroTitle">AllChat</h1>
+        <h1 id="heroTitle"><span>AllChat</span><canvas id="heroWordmark" aria-hidden="true" hidden></canvas></h1>
         <p class="hero-category">Multi-agent planning automation</p>
         <p class="hero-lede">Give multiple AI models one brief. Collect independent proposals, resolve disagreements through review, and hand off a plan every model has approved.</p>
-        <div class="hero-actions"><a class="hero-primary" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a><a class="hero-secondary" href="#workflow">HOW IT WORKS <span aria-hidden="true">↓</span></a></div>
+        <div class="hero-actions"><a class="hero-primary" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a></div>
       </div>
+      <a class="hero-scroll" href="#workflow"><span aria-hidden="true">↓</span> FROM BRIEF TO APPROVED PLAN</a>
+      <button id="heroMotion" type="button" aria-label="Pause background animation" title="Pause background animation" hidden><span aria-hidden="true">Ⅱ</span></button>
     </section>
     <section class="workflow" id="workflow" aria-labelledby="workflowTitle">
       <div class="section-intro"><h2 id="workflowTitle">From brief to approved plan.</h2></div>
