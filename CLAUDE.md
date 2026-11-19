@@ -14,12 +14,19 @@ AllChat is a local-first prototype for coordinating multiple AI models through a
 - No backend, provider credentials, database, or external service calls in this prototype.
 - Avoid adding dependencies unless the prototype cannot reasonably work without them.
 
+## Visual style
+
+- Use the approved interface at commit `76080dd` as the reference for all future UI changes.
+- Use the grayscale Vantablack palette in `styles.css`. Keep the homepage and its navigation pure black (`#000000`). Reuse the existing grayscale tokens and square-edged controls for new screens and components.
+- Keep the English homepage full-screen with the original pixel wordmark and animated square particles. Respect reduced-motion settings. Use Geist for headings and JetBrains Mono for controls and supporting text, with system CJK fallbacks.
+- Keep review records in the existing single-window layout. Use monochrome model icons and message bubbles for independent proposals, review findings, and approvals.
+
 ## Structure and naming
 
 - Keep the first prototype in a small number of root-level files (`index.html`, `styles.css`, `app.js`). Draw the homepage's product-specific pixel art on canvas in app.js rather than adding generated image files.
 - Store the four original participant portraits as local PNGs in `assets/avatars/`, named after their lowercase model family. Replace a portrait in place when its design changes.
 - Use local monochrome model marks from Lobe Icons in `assets/icons/` for the chat. Name them after the upstream icon IDs. The original portraits are kept as historical assets.
-- Use Omarchy's Vantablack grayscale palette for the homepage and workspace, with a pure black background for the homepage and its navigation. The full-screen homepage uses an original pixel wordmark and a background animation that respects reduced-motion settings. Bundle Latin Geist and JetBrains Mono WOFF2 files and their license notices under `assets/fonts/`. Use system CJK fonts for Chinese text.
+- Bundle Latin Geist and JetBrains Mono WOFF2 files and their license notices under `assets/fonts/`.
 - Use descriptive English names for files, variables, and UI data identifiers.
 - Do not add generated output or unrelated project documentation.
 
