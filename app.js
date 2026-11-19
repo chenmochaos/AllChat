@@ -9,7 +9,7 @@ const prior = {
   id: 'sample', title: '双模型提案页如何处理部分失败？', models: ['Codex', 'Claude'],
   summaries: ['每个模型独立显示进度。保留已完成的提案和失败原因，刷新后可以接着阅读。', '从 Parley 的运行文件恢复页面。即使一份提案缺失或解析失败，另一份仍然能展开阅读。']
 };
-const example = {id:'annotated-example', title:'中断后，如何继续一次讨论？', models:prior.models};
+const example = {id:'annotated-example', title:'中断后，如何继续一次讨论？', models:['Codex','Gemini','DeepSeek','Claude']};
 const key = 'allchat.workspace.v1';
 let workspace = {models: prior.models, runs: [], active: example.id};
 try {
@@ -31,6 +31,12 @@ function button(label, action, cls = 'primary') {
   item.onclick = action;
   return item;
 }
+function portrait(name) {
+  const image = elem('img', 'portrait');
+  image.src = 'assets/avatars/' + name.toLowerCase() + '.png';
+  image.alt = '';
+  return image;
+}
 function openPanel(title) {
   $('#panelTitle').textContent = title;
   $('#panelBody').replaceChildren();
@@ -45,7 +51,7 @@ $('#config').onclick = () => {
     const label = elem('label', 'option');
     const input = elem('input');
     input.type = 'checkbox'; input.checked = workspace.models.includes(name); input.value = name;
-    label.append(input, name); body.append(label);
+    label.append(input, portrait(name), name); body.append(label);
     return input;
   });
   const submit = button('保存设置', () => {
@@ -72,7 +78,7 @@ let timer;
 function demoReview(models, elapsed) {
   const votes = {};
   let revision = 1;
-  let arrived = Math.max(0, Math.floor((elapsed - models.length * 950) / 1100));
+  let arrived = Math.max(0, Math.floor((elapsed - models.length * 450) / 400));
   for (const version of [1, 2]) {
     if (!arrived) break;
     revision = version;
@@ -86,6 +92,7 @@ function demoReview(models, elapsed) {
   return {revision, votes, done: models.every(model => votes[model] === '无异议，可执行')};
 }
 let revisionChoice = null;
+let selectedMember;
 $('#new').onclick = () => { $('#composer').showModal(); $('#task').focus(); };
 function render() {
   clearTimeout(timer);
@@ -95,24 +102,24 @@ function render() {
   const live = !archive && !preview && run.consensusDemo;
   const elapsed = Math.max(0, Date.now() - (run.started || Date.now()));
   const total = run.models.length;
-  const received = live ? Math.min(total, Math.floor(elapsed / 950)) : total;
+  const received = live ? Math.min(total, Math.floor(elapsed / 450)) : total;
   const latest = demoReview(run.models, elapsed);
   const available = preview ? 2 : live ? latest.revision : 1;
   const version = Math.min(revisionChoice || (preview ? 1 : available), available);
   const ballot = preview || (live && version < available) ?
-    demoReview(run.models, total * 950 + total * 1100 * version) : latest;
+    demoReview(run.models, total * 450 + total * 400 * version) : latest;
   const votes = live || preview ? ballot.votes : {};
   const critic = run.models.find(name => votes[name] && votes[name] !== '无异议，可执行');
   const confirmed = (live || preview) && ballot.done;
   const view = [run.id, received, version, available, ...Object.values(votes), run.handoff].join('|');
   if (view !== lastView) {
     const sameRun = lastView.split('|')[0] === run.id;
-    const expanded = sameRun ? [...document.querySelectorAll('#rows details[open]')].map(d => d.dataset.name) : [];
+    if (!sameRun) selectedMember = critic || run.models[0];
+    const focused = $('#rows').contains(document.activeElement) ? document.activeElement.dataset.name : null;
     lastView = view;
     $('#runTitle').textContent = run.title;
     $('#source').textContent = archive ? '实测归档' : preview ? '批注示例' : '本地演示';
-    $('#summary').textContent = archive ? '2026.11.19　 /　 两份独立提案' : preview ?
-      '方案修订回放　 /　 Codex × Claude' : run.models.join(' × ') + '　 /　 模拟讨论';
+    $('#summary').textContent = archive ? '2026.11.19' : preview ? '方案修订回放' : '模拟讨论';
     const versions = $('#versions'); versions.replaceChildren();
     for (let n = 1; n <= available; n++) {
       const tab = button('v' + n, () => { revisionChoice = n === available ? null : n; if (preview) revisionChoice = n; render(); }, 'version');
@@ -137,14 +144,26 @@ function render() {
     $('#verdict').textContent = archive ? '首轮实测 · 2 份提案' : !preview && !live ? '旧版演示记录' :
       received < total ? '独立提案 · ' + received + ' / ' + total : confirmed ? '全员确认可执行' : '交叉审查 · v' + version;
     const rows = $('#rows'); rows.replaceChildren();
+    const insights = new Map();
+    function selectMember(name) {
+      selectedMember = name;
+      for (const member of rows.children) member.setAttribute('aria-pressed', String(member.dataset.name === name));
+      const voice = $('#voice');
+      voice.replaceChildren(elem('b','speaker',name), elem('span','opinion',insights.get(name)));
+      voice.classList.toggle('objection', name === critic);
+    }
     run.models.forEach((name,index) => {
-      const item = elem('details'); item.dataset.name = name; item.open = expanded.includes(name);
-      const head = elem('summary'); head.append(elem('b','agent', name));
+      const item = button('', () => selectMember(name), 'member');
+      item.dataset.name = name;
       const state = archive ? ['1 分 41 秒','4 分 33 秒'][index] : name === critic ? '有异议' : votes[name] ? '已确认' : received > index ? '已提案' : '准备中';
-      head.append(elem('span',name === critic ? 'issue' : 'state',state)); item.append(head);
-      const copy = archive ? prior.summaries[index] : preview ? (name === 'Codex' ? '逐个保存参与者的结果，每次刷新按任务标识读取。' : '明确部分完成时的恢复行为，再交给执行模型。') : received > index ? agents[name][1] : '等待提案。';
-      item.append(elem('p','copy',copy)); rows.append(item);
+      item.append(portrait(name), elem('b','agent',name), elem('span', name === critic ? 'issue' : 'state',state));
+      item.classList.toggle('thinking', live && received <= index);
+      insights.set(name, name === critic ? '需要补充恢复条件：刷新时如何保留已经完成的提案？' :
+        archive ? prior.summaries[index] : confirmed ? '已确认当前版本无异议，可以执行。' : received > index ? agents[name][1] : '等待提案。');
+      rows.append(item);
     });
+    selectMember(selectedMember);
+    if (focused) [...rows.children].find(member => member.dataset.name === focused)?.focus({preventScroll:true});
     const next = $('#next'); next.replaceChildren();
     if (run.choice) next.append(elem('p','small','历史决策 · ' + run.choice));
     if (confirmed || run.handoff) {

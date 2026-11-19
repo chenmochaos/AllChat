@@ -5,10 +5,14 @@
   <title>AllChat · 方案评审</title><link rel="stylesheet" href="styles.css"><script defer src="app.js"></script>
 </head>
 <body>
-<header><div class="top"><a href="./index.html" class="brand">AllChat<span>.</span></a><span class="workspace">/　工作区</span><nav><button id="history">历史记录</button><button class="primary" id="new">＋ 新讨论</button></nav></div></header>
+<header><div class="top"><a href="./index.html" class="brand"><i class="brand-mark" aria-hidden="true"></i>AllChat</a><span class="workspace">工作区</span><nav><button id="history">历史记录</button><button class="primary" id="new">＋ 新讨论</button></nav></div></header>
 <main>
-  <div class="path">工作区 <span>/</span> 方案评审 <span>/</span> <b id="source">交互示例</b></div>
-  <div class="titleblock"><h1 id="runTitle"></h1><p id="summary" aria-live="polite"></p></div>
+  <div class="titleblock"><div class="context"><b id="source">交互示例</b><span id="summary"></span></div><h1 id="runTitle"></h1></div>
+  <section class="room" aria-label="讨论成员">
+    <div class="room-head"><strong>讨论成员</strong><span id="verdict" aria-live="polite"></span></div>
+    <div id="rows"></div>
+    <div id="voice" aria-live="polite"></div>
+  </section>
   <div class="layout">
     <div class="reader">
       <div class="bar"><strong>方案正文</strong><div id="versions" aria-label="方案版本"></div></div>
@@ -19,7 +23,6 @@
       </article>
       <div id="next"></div>
     </div>
-    <aside class="margin"><div class="bar"><strong>评审记录</strong></div><p class="small" id="verdict"></p><div id="rows"></div></aside>
   </div>
 </main>
 <dialog id="composer" aria-labelledby="composeTitle"><div class="dialog-head"><h2 id="composeTitle">新讨论</h2><button type="button" class="close" aria-label="关闭新讨论" onclick="this.closest('dialog').close()">×</button></div>
