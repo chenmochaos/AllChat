@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .parley-runtime/
 .allchat-job-*/
+/desktop/src/
+/desktop/pkg/
+/desktop/*.pkg.tar.*
+/dist/

@@ -80,7 +80,9 @@ class Application:
 
     def post(self,path,d):
         if path=="/api/folder":
-            proc=subprocess.run([sys.executable,"-c",PICKER],capture_output=True,text=True,timeout=300)
+            picker=ROOT/"pick_folder.py"
+            args=[str(picker)] if picker.is_file() else ["-c",PICKER]
+            proc=subprocess.run([sys.executable,*args],capture_output=True,text=True,timeout=300)
             if proc.returncode:raise ValueError("无法显示系统文件夹选择器。请在桌面终端启动服务，或使用 --project 选择目录。")
             value=proc.stdout.strip()
             if not value:return {}
@@ -179,6 +181,7 @@ def main():
     parser.add_argument("--port",type=int,default=8787)
     parser.add_argument("--data-dir",type=Path,default=Path(os.environ.get("XDG_STATE_HOME",Path.home()/".local/state"))/"allchat")
     parser.add_argument("--project",type=Path)
+    parser.add_argument("--endpoint-file",type=Path,help=argparse.SUPPRESS)
     parser.add_argument("--config",type=Path,default=Path.home()/".config/allchat/connections.json")
     args=parser.parse_args()
     os.umask(0o077)
@@ -186,6 +189,10 @@ def main():
     config=json.loads(args.config.read_text()) if args.config.exists() else {}
     server.app=Application(args.data_dir,config)
     if args.project:server.app.project(args.project,args.project.resolve().name)
+    if args.endpoint_file:
+        temporary=args.endpoint_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps({"pid":os.getpid(),"port":server.server_port}))
+        temporary.replace(args.endpoint_file)
     print(f"http://127.0.0.1:{server.server_port}/#workspace",flush=True)
     server.serve_forever()
 

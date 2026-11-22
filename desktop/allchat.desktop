@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=AllChat
+Comment=Multi-agent planning workspace
+Comment[zh_CN]=本地多 Agent 评审工作区
+Exec=allchat
+Icon=allchat
+Terminal=false
+Categories=Development;
+StartupWMClass=allchat

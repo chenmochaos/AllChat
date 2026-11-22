@@ -1,0 +1,26 @@
+pkgname=allchat
+pkgver=0.1.0
+pkgrel=4
+pkgdesc='Local multi-agent planning workspace'
+arch=('x86_64')
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-webengine' 'qt6-svg' 'qt6-wayland' 'python' 'gtk3' 'python-gobject' 'xdg-desktop-portal' 'systemd')
+options=('!debug')
+
+build() {
+    cd "$srcdir"
+    qmake6 "$startdir/allchat.pro"
+    make
+}
+
+package() {
+    local root="$startdir/.."
+    local share="$pkgdir/usr/share/allchat"
+    install -Dm755 "$srcdir/allchat" "$pkgdir/usr/bin/allchat"
+    install -Dm644 "$startdir/allchat.desktop" -t "$pkgdir/usr/share/applications"
+    install -Dm644 "$root/assets/allchat.svg" -t "$pkgdir/usr/share/icons/hicolor/scalable/apps"
+    install -Dm644 "$root/LICENSE" -t "$pkgdir/usr/share/licenses/allchat"
+    install -Dm644 "$startdir"/{boot,pick_folder}.py "$root"/{server,coordinator,connections,codex_session}.py \
+        "$root"/{index.html,styles.css,app.js,ui.js,live.js} -t "$share"
+    cp -r "$root/assets" "$share/"
+}

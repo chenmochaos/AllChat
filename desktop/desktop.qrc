@@ -1,0 +1,4 @@
+<RCC><qresource prefix="/">
+  <file>Main.qml</file>
+  <file alias="allchat.svg">../assets/allchat.svg</file>
+</qresource></RCC>

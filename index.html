@@ -4,23 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AllChat — Multi-Agent Planning</title>
+  <link rel="icon" href="assets/allchat.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script defer src="app.js"></script>
   <script defer src="ui.js"></script>
   <script defer src="workspace.js"></script>
 </head>
 <body>
-  <header class="topbar" id="home">
-    <div class="top">
-      <a href="#home" class="brand"><span class="brand-mark" aria-hidden="true"></span>ALLCHAT</a>
-      <nav aria-label="Primary">
-        <a class="nav-link" href="#workflow">HOW IT WORKS</a>
-        <a class="nav-cta" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a>
-      </nav>
-    </div>
-  </header>
   <main>
-    <section class="home" aria-labelledby="heroTitle">
+    <section class="launch-screen" aria-labelledby="heroTitle">
       <canvas id="heroArt" aria-hidden="true"></canvas>
       <div class="hero-copy">
         <h1 id="heroTitle"><span>AllChat</span><canvas id="heroWordmark" aria-hidden="true" hidden></canvas></h1>
@@ -28,23 +20,13 @@
         <p class="hero-lede">Give multiple AI models one brief. Collect independent proposals, resolve disagreements through review, and hand off a plan every model has approved.</p>
         <div class="hero-actions"><a class="hero-primary" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a></div>
       </div>
-      <a class="hero-scroll" href="#workflow"><span aria-hidden="true">↓</span> FROM BRIEF TO APPROVED PLAN</a>
-      <button id="heroMotion" type="button" aria-label="Pause background animation" title="Pause background animation" hidden><span aria-hidden="true">Ⅱ</span></button>
-    </section>
-    <section class="workflow" id="workflow" aria-labelledby="workflowTitle">
-      <div class="section-intro"><h2 id="workflowTitle">From brief to approved plan.</h2></div>
-      <div class="steps">
-        <article class="step"><span class="step-number">01</span><h3>Think independently</h3><p>Each model develops a proposal before seeing the others.</p><span class="step-glyph" aria-hidden="true">┌ ┐<br>└ ┘</span></article>
-        <article class="step"><span class="step-number">02</span><h3>Review the plan</h3><p>Models assess the same draft. Disagreements stay attached to the decision.</p><span class="step-glyph" aria-hidden="true">┌─┬─┐<br>└─┴─┘</span></article>
-        <article class="step"><span class="step-number">03</span><h3>Confirm, then build</h3><p>A revision is ready when every model agrees it is clear and executable.</p><span class="step-glyph" aria-hidden="true">┌───┐<br>└─✓─┘</span></article>
-      </div>
     </section>
     <section class="workspace" id="workspace" aria-labelledby="workspaceTitle">
       <section class="local-agents" lang="zh-CN" aria-labelledby="localAgentsTitle">
         <div class="local-agents-head"><h3 id="localAgentsTitle">本地 Agent</h3><span id="scanState" role="status"></span><button id="scanAgents" type="button">预览识别</button></div>
         <div class="agent-rail" id="agentRail" aria-label="本机检测快照"></div>
       </section>
-      <div class="workspace-heading"><h2 id="workspaceTitle">Review workspace</h2><a href="#home" class="back-top">BACK TO TOP ↑</a></div>
+      <div class="workspace-heading"><h2 id="workspaceTitle">Review workspace</h2></div>
       <section class="chat" lang="zh-CN" aria-labelledby="runTitle">
       <div class="work-tools">
         <button id="project" class="tool" aria-controls="projectPanel" aria-expanded="false"><span class="folder-icon" aria-hidden="true"></span><span id="projectName">项目文件夹</span> ⌄</button>
