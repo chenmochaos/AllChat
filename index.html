@@ -21,51 +21,55 @@
         <div class="hero-actions"><a class="hero-primary" href="#workspace">OPEN WORKSPACE <span aria-hidden="true">↘</span></a></div>
       </div>
     </section>
-    <section class="workspace" id="workspace" aria-labelledby="workspaceTitle">
-      <section class="local-agents" lang="zh-CN" aria-labelledby="localAgentsTitle">
+    <section class="workspace studio" id="workspace" lang="zh-CN" aria-labelledby="workspaceTitle">
+      <header class="studio-bar"><div class="studio-brand"><img src="assets/allchat.svg" alt=""><strong>AllChat</strong><span>/</span><h2 id="workspaceTitle">Review workspace</h2></div>
+      <button type="button" id="toggleAgents" aria-controls="localAgents" aria-expanded="false">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        本地 Agent
+      </button>
+      <section id="localAgents" class="local-agents" aria-labelledby="localAgentsTitle" hidden>
         <div class="local-agents-head"><h3 id="localAgentsTitle">本地 Agent</h3><span id="scanState" role="status"></span><button id="scanAgents" type="button">预览识别</button></div>
         <div class="agent-rail" id="agentRail" aria-label="本机检测快照"></div>
       </section>
-      <div class="workspace-heading"><h2 id="workspaceTitle">Review workspace</h2></div>
+      </header>
+      <div class="studio-body">
+      <nav class="library" aria-label="项目与会话">
+        <div class="library-heading"><h3>项目</h3><button id="addProject" title="导入项目" aria-label="导入项目">＋</button></div>
+        <div id="projectTree"></div>
+      </nav>
       <section class="chat" lang="zh-CN" aria-labelledby="runTitle">
-      <div class="work-tools">
-        <button id="project" class="tool" aria-controls="projectPanel" aria-expanded="false"><span class="folder-icon" aria-hidden="true"></span><span id="projectName">项目文件夹</span> ⌄</button>
-        <button id="config" class="tool">Agent 配置</button>
-        <button id="newRun" class="tool new-run">＋ 新讨论</button>
-      </div>
-      <section id="projectPanel" class="project-panel" aria-labelledby="importTitle" hidden>
-        <h3 id="importTitle">打开项目</h3>
-        <button class="entry" id="addProject" type="button">＋ 创建项目</button>
-        <h4>最近项目</h4><div id="recentProjects"></div>
-      </section>
       <div class="chat-head">
         <div class="chat-title">
-          <div class="context"><span id="source">评审示例</span><span class="context-dot" aria-hidden="true">/</span><span id="verdict" aria-live="polite"></span></div>
+          <div class="context"><span id="projectName">项目文件夹</span><span id="verdict" aria-live="polite"></span></div>
           <h3 id="runTitle"></h3>
         </div>
-        <button id="history" class="history-button">历史记录</button>
       </div>
       <div id="members" aria-label="讨论成员"></div>
-      <div class="view-tabs" aria-label="查看内容"><button data-view="boss" aria-pressed="true">BOSS 对话</button><button data-view="reviews" aria-pressed="false">评审记录</button><button data-view="plan" aria-pressed="false">方案版本</button></div>
+      <div class="view-tabs" aria-label="查看内容"><button data-view="boss" aria-pressed="true">对话</button><button data-view="plan" aria-pressed="false">方案版本</button></div>
       <div id="conversation" class="viewport" aria-label="讨论内容" tabindex="0"></div>
       <div id="handoff" hidden></div>
       <form id="compose">
-        <textarea id="task" rows="1" maxlength="2000" required placeholder="问 BOSS…" aria-label="问 BOSS"></textarea>
+        <textarea id="task" rows="2" maxlength="8000" required placeholder="输入问题或目标…" aria-label="消息"></textarea>
+        <div class="compose-tools">
+        <button id="config" type="button" class="tool" title="Agent 配置">Agent 配置</button>
+        <button id="attach" type="button" aria-label="添加共享材料" title="添加共享材料">＋</button>
         <button class="send" type="submit" aria-label="发送" title="发送">↑</button>
+        </div>
       </form>
       <p class="demo-note">本地交互演示 · 发言与交接均为模拟</p>
       </section>
+      </div>
     </section>
   </main>
   <dialog id="createProject" lang="zh-CN" aria-labelledby="createTitle">
     <form id="createForm">
-      <div class="dialog-head"><h2 id="createTitle">创建项目</h2><button type="button" class="icon-button close" id="closeCreate" aria-label="关闭">×</button></div>
+      <div class="dialog-head"><h2 id="createTitle">导入项目</h2><button type="button" class="icon-button close" id="closeCreate" aria-label="关闭">×</button></div>
       <label class="project-name-field"><span class="folder-icon" aria-hidden="true"></span><input id="createName" autofocus maxlength="120" placeholder="项目名称" aria-label="项目名称" autocomplete="off"></label>
       <p class="source-label">源文件夹</p>
       <div class="source-zone"><span id="folderName" role="status">在此电脑上添加文件夹</span><button id="browseFolder" type="button"><span class="folder-icon" aria-hidden="true"></span><span>添加</span></button>
         <input type="file" id="folderFiles" webkitdirectory hidden>
       </div>
-      <div class="create-actions"><button type="button" id="cancelCreate">取消</button><button class="primary" id="confirmCreate" disabled>创建项目</button></div>
+      <div class="create-actions"><button type="button" id="cancelCreate">取消</button><button class="primary" id="confirmCreate" disabled>导入项目</button></div>
     </form>
   </dialog>
   <dialog id="panel" lang="zh-CN" aria-labelledby="panelTitle">

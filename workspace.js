@@ -133,33 +133,11 @@ $('#config').onclick = () => {
 };
 let view = 'boss', author = '', revision = 0, timer;
 function resetView() { view='boss'; author=''; revision=0; $('#task').value=''; }
-function selectProject(path) {
-  state.projects = [...state.projects.filter(p=>p!==path),path];
-  state.project=path; save(); resetView(); closeProjects(); render();
+function selectProject(path,chat=null) {
+  if(!state.projects.includes(path))state.projects.push(path);
+  state.project=path;state.active[path]=chat;save();resetView();render();
+  if(!chat)$('#task').focus({preventScroll:true});
 }
-function closeProjects(){
-  $('#projectPanel').hidden=true;
-  $('#project').setAttribute('aria-expanded','false');
-  $('#project').focus({preventScroll:true});
-}
-$('#project').onclick=()=>{
-  if(!$('#projectPanel').hidden){closeProjects();return;}
-  const recent=$('#recentProjects');
-  recent.replaceChildren();
-  for(const path of [...state.projects].reverse()) {
-    const row=button('',()=>selectProject(path),'project-entry');
-    const {name,folder}=projectInfo(path);
-    row.append(elem('i','folder-icon'),elem('strong','',name),elem('small','',folder));
-    if(path===state.project) row.append(elem('span','hint','当前'));
-    recent.append(row);
-  }
-  $('#projectPanel').hidden=false;
-  $('#project').setAttribute('aria-expanded','true');
-  $('#addProject').focus();
-};
-document.addEventListener('pointerdown',e=>{
-  if(!$('#projectPanel').hidden && !e.target.closest('#projectPanel,#project')) closeProjects();
-});
 const createDialog=$('#createProject'), projectNameInput=$('#createName');
 let selectedFolder='';
 function validateProject(){ $('#confirmCreate').disabled=!(selectedFolder && projectNameInput.value.trim()); }
@@ -172,7 +150,7 @@ function setFolder(name){
   validateProject();
 }
 $('#addProject').onclick=()=>{
-  closeProjects(); $('#createForm').reset(); selectedFolder='';
+  $('#createForm').reset(); selectedFolder='';
   $('#folderName').textContent='在此电脑上添加文件夹';
   $('#browseFolder span:last-child').textContent='添加';
   validateProject(); createDialog.showModal();
@@ -195,28 +173,6 @@ $('#createForm').onsubmit=e=>{
   state.projectInfo[id]={name,folder:selectedFolder};
   createDialog.close(); selectProject(id);
 };
-$('#projectPanel').onkeydown=e=>{if(e.key==='Escape')closeProjects();};
-$('#history').onclick = () => {
-  const body = panel('项目讨论记录');
-  body.append(elem('p','hint',projectInfo().name));
-  const runs = state.runs.filter(r=>r.project===state.project);
-  for (const r of runs) body.append(button(r.title,()=>{state.active[state.project]=r.id; save(); resetView(); dialog.close(); render();},'entry'));
-  if (!runs.length) body.append(elem('p','empty','这个项目还没有讨论。'));
-};
-function newDiscussion() {
-  const body = panel('新讨论');
-  body.append(elem('p','hint',projectInfo().name));
-  const field = elem('label','field','你想解决什么问题？');
-  const brief=elem('textarea'); brief.rows=3; brief.required=true; brief.maxLength=2000; field.append(brief); body.append(field);
-  const prefs=projectPrefs();
-  body.append(elem('p','hint','本次参会 · '+prefs.agents.join('、')),button('发起演示讨论',()=>{
-    if(!brief.value.trim()){brief.value=''; brief.reportValidity(); return;}
-    const r=makeRun(state.project,brief.value.trim(),prefs);
-    state.runs.unshift(r); state.active[state.project]=r.id; save(); dialog.close(); resetView(); render();
-  }));
-  brief.focus();
-}
-$('#newRun').onclick=newDiscussion;
 function phase(r) {
   if(r.handoff) return '交接已模拟';
   if(r.choice!==null) return Date.now()-r.decided<1200?'正在确认新版':'全员已确认';
@@ -234,19 +190,21 @@ function decide(r,choice) {
 function scrollBottom(){const log=$('#conversation'); log.scrollTop=log.scrollHeight;}
 function bossView(box,r,status) {
   const f=fixture(r);
-  box.append(bubble('你',r.title,'需求',true));
-  if(['独立出案','交叉评审'].includes(status)){
-    box.append(bubble(r.boss,status==='独立出案'?'各位正在分别写第一份提案。':'首轮提案收齐了。各位正在读其他人的意见，准备自己的 v2。','BOSS'));return;
+  box.append(bubble('你',r.title,'目标',true),coordinationReply(r));
+  if(status==='独立出案'){
+    for(const name of r.agents)box.append(bubble(name,workingText(r,{id:name,stage:'draft'}),'独立提案'));
+  }else reviewView(box,r,status);
+  if(!['独立出案','交叉评审'].includes(status)){
+    box.append(bubble(r.boss,f.summary,'BOSS · 第 1 轮汇总'));
+    if(r.choice===null){
+      const card=elem('section','decision');
+      card.append(elem('span','decision-label','待你决定'),elem('h4','',f.question));
+      const actions=elem('div','actions');
+      f.options.forEach((v,i)=>actions.append(button(v,()=>decide(r,i),i?'secondary':'primary')));
+      card.append(actions);box.append(card);
+    }
   }
-  box.append(bubble(r.boss,f.summary,'BOSS · 第 1 轮汇总'));
-  if(r.choice===null){
-    const card=elem('section','decision');
-    card.append(elem('span','decision-label','待你决定'),elem('h4','',f.question));
-    const actions=elem('div','actions');
-    f.options.forEach((v,i)=>actions.append(button(v,()=>decide(r,i),i?'secondary':'primary')));
-    card.append(actions);box.append(card);
-  }
-  for(const m of r.messages) box.append(bubble(m.user?'你':r.boss,m.text,m.user?'':'BOSS',m.user));
+  for(const m of r.messages)box.append(bubble(m.user?'你':r.boss,m.text,m.user?'提问':'BOSS',m.user));
 }
 function personalText(r,i,v) {
   const f=fixture(r);
@@ -298,15 +256,16 @@ function render() {
   clearTimeout(timer);
   const r=activeRun(), box=$('#conversation'), footer=$('#handoff');
   $('#projectName').textContent=projectInfo().name;
-  $('#project').title=projectInfo().folder;
-  $('#source').textContent='本地演示';
-  $('#runTitle').textContent=r?.title||'开始一场讨论';
+  projectTree(state.projects.map(id=>({id,name:projectInfo(id).name,path:projectInfo(id).folder})),state.runs,state.project,r?.id,selectProject);
+  composeMode(!!r);$('#attach').hidden=true;
+  $('#runTitle').textContent=r?.title||'我们要解决什么问题？';
   const status=r?(r.legacy?'旧版记录':phase(r)):'项目已就绪';
   $('#verdict').textContent=status;
+  const scroll=box.scrollTop,stick=box.scrollHeight-box.clientHeight-scroll<36;
   box.replaceChildren(); footer.replaceChildren(); footer.hidden=true;
-  $('#members').replaceChildren(); $('#compose').hidden=!r||r.legacy;
-  document.querySelectorAll('[data-view]').forEach(b=>{b.disabled=!r||r.legacy;b.setAttribute('aria-pressed',String(b.dataset.view===view));});
-  if(!r){box.append(elem('p','empty','这个项目还没有讨论。'));return;}
+  $('#members').replaceChildren(); $('#compose').hidden=!!r?.legacy;
+  document.querySelectorAll('[data-view]').forEach(b=>{b.disabled=!!r?.legacy;b.setAttribute('aria-pressed',String(b.dataset.view===view));});
+  if(!r)return;
   if(r.legacy){box.append(elem('p','empty','旧版演示 · '+r.models.join('、')),elem('p','',r.title));return;}
   const members=$('#members');
   const host=elem('span','host');
@@ -319,19 +278,23 @@ function render() {
   }
   box.classList.toggle('plan',view==='plan');
   if(view==='boss')bossView(box,r,status);
-  if(view==='reviews')reviewView(box,r,status);
   if(view==='plan')planView(box,r,status);
   if(status==='全员已确认'||r.handoff){
     footer.hidden=false;
     footer.append(elem('span','',r.handoff?'模拟交接完成 · '+r.handoff:'共同稿 v2 · '+r.agents.length+' 位 Agent 全员确认'));
     if(!r.handoff)footer.append(button('交给执行 Agent',()=>handoff(r)));
   }
+  box.scrollTop=stick?box.scrollHeight:scroll;
   const next=status==='独立出案'?r.started+1000:status==='交叉评审'?r.started+2300:status==='正在确认新版'?r.decided+1200:0;
   if(next)timer=setTimeout(render,Math.max(1,next-Date.now()));
 }
 $('#compose').onsubmit=e=>{
   e.preventDefault();const r=activeRun(), q=$('#task').value.trim();
-  if(!r || !q)return;
+  if(!q)return;
+  if(!r){
+    const created=makeRun(state.project,q,projectPrefs());state.runs.unshift(created);
+    foldedProjects.delete(state.project);selectProject(state.project,created.id);return;
+  }
   const f=fixture(r);
   const reply=r.choice!==null?'你已经选了“'+f.options[r.choice]+'”。验收时可以这样检查：'+f.criteria[r.choice]:
     '在这个演示里，你可以比较两种做法。第一种会'+f.outcomes[0]+' 第二种会'+f.outcomes[1];

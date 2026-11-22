@@ -48,7 +48,8 @@ class WorkflowTest(unittest.TestCase):
     def idle(self):
         for _ in range(400):
             with self.engine.lock:
-                if self.key not in self.engine.active:return self.store.read("run",self.key)
+                if self.key not in self.engine.active and self.key not in self.engine.chat_active:
+                    return self.store.read("run",self.key)
             time.sleep(.01)
         self.fail("worker did not finish")
 
@@ -76,6 +77,30 @@ class WorkflowTest(unittest.TestCase):
         with self.assertRaises(ValueError):self.engine.action(self.key,"end",{"revision":"stale"})
         self.engine.action(self.key,"end",{"revision":r["plans"][0]["digest"]})
         self.assertEqual(self.idle()["stage"],"ended")
+
+    def test_boss_answers_while_agents_are_drafting(self):
+        drafting=threading.Event()
+        release=threading.Event()
+        def slow_draft(agent,prompt,*args):
+            if "请独立提出" in prompt:
+                drafting.set()
+                release.wait(5)
+            return self.call(agent,prompt,*args)
+        self.engine.invoke=slow_draft
+        self.start()
+        try:
+            self.assertTrue(drafting.wait(2))
+            self.engine.action(self.key,"ask",{"text":"这个项目的目标是什么？"})
+            for _ in range(150):
+                r=self.store.read("run",self.key)
+                if r["questions"][0].get("answer"):break
+                time.sleep(.01)
+            self.assertTrue(r["questions"][0].get("answer"))
+            self.assertEqual(r["stage"],"draft")
+            self.assertEqual([j["agent"] for j in r["jobs"] if j["stage"]=="ask"],[r["boss"]])
+        finally:
+            release.set()
+            self.idle()
 
     def test_retry_only_failed_and_restart(self):
         self.inject_failure=True;self.start()

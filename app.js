@@ -102,7 +102,7 @@ function launchIntro() {
   const canvas = $('#heroArt');
   const ctx = canvas.getContext('2d');
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  if (!ctx || motion.matches) { splash.remove(); return; }
+  if (!ctx || motion.matches || document.hidden) { splash.remove(); return; }
   const style = pickIntroStyle();
   splash.dataset.effect = style;
   let paintWordmark = drawWordmark(style);
@@ -112,10 +112,13 @@ function launchIntro() {
     cancelAnimationFrame(frame);
     motion.removeEventListener('change', finish);
     document.removeEventListener('keydown', skip);
+    document.removeEventListener('visibilitychange', onVisibility);
     workspace.inert = false;
     splash.remove();
   }
   function skip(event) { if (event.key === 'Escape') finish(); }
+  function onVisibility() { if (document.hidden) finish(); }
+  document.addEventListener('visibilitychange', onVisibility);
   document.addEventListener('keydown', skip);
   splash.addEventListener('click', finish, {once:true});
   motion.addEventListener('change', finish);

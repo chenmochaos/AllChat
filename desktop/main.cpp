@@ -9,6 +9,11 @@
 
 int main(int argc, char **argv)
 {
+    // The native Wayland WebEngine surface can stay black after a Hyprland workspace change.
+    const auto platforms = qgetenv("QT_QPA_PLATFORM");
+    if (qEnvironmentVariableIsSet("HYPRLAND_INSTANCE_SIGNATURE") && !qgetenv("DISPLAY").isEmpty()
+        && (platforms.isEmpty() || platforms == "wayland;xcb"))
+        qputenv("QT_QPA_PLATFORM", "xcb;wayland");
     QtWebEngineQuick::initialize();
     QGuiApplication app(argc, argv);
     app.setApplicationName("AllChat");

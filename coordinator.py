@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
+import time
 import uuid
 
 import connections
@@ -72,6 +73,7 @@ class Coordinator:
         self.store,self.config,self.invoke=store,config,invoke
         self.lock=store.lock
         self.active=set()
+        self.chat_active=set()
         for run in store.all("run"):
             for job in run["jobs"]:
                 if job["status"]=="working":
@@ -100,6 +102,9 @@ class Coordinator:
             if key not in self.active:
                 self.active.add(key)
                 threading.Thread(target=self._work,args=(key,),daemon=True).start()
+            if key not in self.chat_active:
+                self.chat_active.add(key)
+                threading.Thread(target=self._answer_questions,args=(key,),daemon=True).start()
 
     def action(self,key,action,data):
         with self.lock:
@@ -115,7 +120,7 @@ class Coordinator:
             elif action=="ask":
                 question=data.get("text","").strip()
                 if not question or len(question)>8000:raise ValueError("请输入简短的问题。")
-                r["questions"].append({"id":uuid.uuid4().hex,"text":question})
+                r["questions"].append({"id":uuid.uuid4().hex,"text":question,"sent":time.time()})
             elif action=="members" and (r["stage"] in ("choice","limit","approved") or any(j["status"]=="failed" for j in r["jobs"])):
                 names=data.get("agents",[])
                 if (not isinstance(names,list) or len(names)<2 or len(set(names))!=len(names) or
@@ -124,9 +129,10 @@ class Coordinator:
                 if any(j["status"]=="working" for j in r["jobs"]):raise ValueError("请等待当前调用结束。")
                 if r["stage"] in ("execute","delivered","ended"):raise ValueError("本次讨论已关闭。")
                 for j in r["jobs"]:
-                    if j["status"] in ("queued","failed"):j["status"]="superseded"
+                    if j["stage"]!="ask" and j["status"] in ("queued","failed"):j["status"]="superseded"
                 old=r["agents"]
                 r["decisions"].append("参会名单由 "+", ".join(old)+" 改为 "+", ".join(names))
+                r.setdefault("decisionTimes",{})[str(len(r["decisions"])-1)]=time.time()
                 r["agents"]=names
                 r.update(stage="join",round=r["round"]+1)
                 self.archive(r)
@@ -134,6 +140,7 @@ class Coordinator:
                 decision=data.get("text","").strip()
                 if not decision or len(decision)>8000:raise ValueError("请输入你的决定。")
                 r["decisions"].append(decision)
+                r.setdefault("decisionTimes",{})[str(len(r["decisions"])-1)]=time.time()
                 if r["stage"]=="limit" and r["limit"]: r["limit"]+=1
                 r.update(stage="review",round=r["round"]+1)
                 self.archive(r)
@@ -152,9 +159,6 @@ class Coordinator:
             return r
 
     def _tasks(self,r):
-        for q in r["questions"]:
-            if "answer" not in q:
-                return "ask",q["id"],[r["boss"]]
         stage=r["stage"]
         if stage=="join":
             written={j["agent"] for j in r["jobs"] if j["stage"] in ("draft","revise","join") and j["status"]=="done" and j["round"]<r["round"]}
@@ -187,13 +191,47 @@ class Coordinator:
             instruction='核对共同稿是否解决你的异议、有可执行步骤和可检查的验收条件。仅返回 JSON {"revision":"原样复制 digest","approve":true或false,"objection":"通过时为空字符串，否则写具体异议"}。'
         elif stage=="ask":
             brief.update(当前共同稿=plan,各家已发布提案=latest if r["stage"]!="draft" else {},
-                         用户问题=next(q["text"] for q in r["questions"] if q["id"]==reference))
+                         项目目录=r["path"], 用户问题=next(q["text"] for q in r["questions"] if q["id"]==reference))
             instruction="担任 BOSS，只解释这次提问。用日常中文回答，不更改方案或代用户作决定。"
         else:
             brief.update(已确认共同稿=plan,项目目录=r["path"])
             instruction="用户已经选择你接手执行。按这份已确认方案在当前项目执行，报告实际交付、检查结果和阻碍。需要改变方案时暂停并说明。"
         boundary="" if stage=="execute" else "目前处于方案讨论阶段。仅作分析，不修改项目文件。"
         return boundary+instruction+"\n以下是本轮任务材料：\n"+encode(brief)
+
+    def _answer_questions(self,key):
+        # Serialize follow-ups in their own BOSS session while the planning group works.
+        try:
+            while True:
+                with self.lock:
+                    r=self.store.read("run",key)
+                    jobs={j["id"]:j for j in r["jobs"] if j["stage"]=="ask"}
+                    for q in r["questions"]:
+                        tag=f"ask/{q['id']}/{r['boss']}"
+                        job=jobs.get(tag)
+                        if "answer" not in q and (not job or job["status"] in ("queued","done")):
+                            break
+                    else:
+                        self.chat_active.discard(key)
+                        return
+                    if job and job["status"]=="done":
+                        q["answer"]=job["text"]
+                        self.store.put("run",key,r)
+                        self.archive(r)
+                        continue
+                    if not job:
+                        job=dict(id=tag,agent=r["boss"],stage="ask",round=r["round"],sent=time.time(),
+                                 prompt=self._prompt(r,"ask",r["boss"],q["id"]))
+                        r["jobs"].append(job)
+                    job["status"]="working"
+                    self.store.put("run",key,r)
+                self._call(key,job)
+        except Exception as exc:
+            with self.lock:
+                r=self.store.read("run",key)
+                r["error"]=str(exc)
+                self.store.put("run",key,r)
+                self.chat_active.discard(key)
 
     def _work(self,key):
         try:
@@ -213,7 +251,7 @@ class Coordinator:
                         tag=f"{stage}/{ref}/{agent}"
                         job=next((j for j in r["jobs"] if j["id"]==tag),None)
                         if not job:
-                            job=dict(id=tag,agent=agent,stage=stage,round=r["round"],status="queued",
+                            job=dict(id=tag,agent=agent,stage=stage,round=r["round"],status="queued",sent=time.time(),
                                      prompt=self._prompt(r,stage,agent,ref))
                             r["jobs"].append(job)
                         group.append(job)
@@ -239,7 +277,7 @@ class Coordinator:
     def _call(self,key,job):
         with self.lock:r=self.store.read("run",key)
         stage=job["stage"]
-        role=("boss" if stage in ("ask","merge") else "execute" if stage=="execute" else "participant")+"/"+job["agent"]
+        role={"ask":"chat","merge":"boss","execute":"execute"}.get(stage,"participant")+"/"+job["agent"]
         history=[]
         for old in r["jobs"]:
             if old.get("role")==role and old["status"]=="done":
@@ -255,14 +293,12 @@ class Coordinator:
             update.update(status="failed",error=str(exc)[:500])
         with self.lock:
             current=self.store.read("run",key)
-            next(j for j in current["jobs"] if j["id"]==job["id"]).update(update,role=role)
+            next(j for j in current["jobs"] if j["id"]==job["id"]).update(update,role=role,updated=time.time())
             if session:current["sessions"][role]=session
             self.store.put("run",key,current)
 
     def _advance(self,r,stage,ref,group):
-        if stage=="ask":
-            next(q for q in r["questions"] if q["id"]==ref)["answer"]=group[0]["text"]
-        elif stage in ("draft","join","review","revise"):
+        if stage in ("draft","join","review","revise"):
             r["stage"]={"draft":"review","join":"review","review":"revise","revise":"merge"}[stage]
         elif stage=="merge":
             plan=dict(group[0]["parsed"],version=len(r["plans"])+1)

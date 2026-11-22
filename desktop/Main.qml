@@ -13,12 +13,19 @@ Window {
     title: "AllChat"
     property url workspaceUrl
     property string failure: ""
+    property bool rendererStopped: false
 
     WebEngineView {
+        id: web
         anchors.fill: parent
         backgroundColor: window.color
         url: window.workspaceUrl
         visible: window.failure === ""
+        onRenderProcessTerminated: (status, code) => {
+            console.warn("AllChat web renderer exited", status, code)
+            window.rendererStopped = true
+            window.failure = qsTr("页面显示进程已退出。点击这里重新打开会话。")
+        }
         onNavigationRequested: request => {
             if (request.isMainFrame && request.url.toString().split("#")[0] !== window.workspaceUrl.toString().split("#")[0])
                 request.reject()
@@ -36,5 +43,14 @@ Window {
         color: "#ddd"
         text: window.failure
         textFormat: Text.PlainText
+        MouseArea {
+            anchors.fill: parent
+            enabled: window.rendererStopped
+            onClicked: {
+                window.rendererStopped = false
+                window.failure = ""
+                web.reload()
+            }
+        }
     }
 }

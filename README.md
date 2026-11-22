@@ -1,8 +1,8 @@
----
-created: 2026-11-22
-updated: 2026-11-22
----
-# AllChat
+# ![AllChat · Multi-agent planning automation](docs/readme-intro.gif)
+
+让多个 AI 在同一个项目里各自出方案、互相挑问题。**有分歧时由你拍板，全员确认后由你选 Agent 执行。**
+
+[下载桌面预览版](https://github.com/chenmochaos/AllChat/actions/workflows/desktop.yml) · [开始讨论](#开始讨论) · [连接 Agent](#连接-agent)
 
 ## Why
 
@@ -14,20 +14,28 @@ updated: 2026-11-22
 
 最后确认方案无异议后用户可以选择Agent来执行。
 
-## 启动
+## 开始讨论
 
-Windows 和 macOS 预览包可在仓库 **Actions → Desktop packages → 对应构建 → Artifacts** 下载。解压到本地后：
+1. **选项目，提问题。** 添加本地项目文件夹，选至少两位可用的参会 Agent，再指定一位 BOSS（可由参会者兼任）。可以沿用已有配置。输入你的问题和目标，开始讨论。
+2. **各写一版，再互评。** 每位 Agent 先独立写 v1，读完其他人的提案后提出异议，再根据本轮反馈各自写 v2。
+3. **看共同稿，决定取舍。** BOSS 汇总个人修订稿。有需要你决定的事，讨论会暂停；没有待决问题，就由每位 Agent 核对同一份共同稿。只要还有异议，就继续评审。默认最多八轮，到上限时由你决定是否继续。
+4. **交给执行者。** 全员确认后，点击「交给执行 Agent」，选择接手的人选。需要直接修改项目文件时，选择有本地文件工具的 Agent。
 
-- Windows x64：解压完整的 Windows 压缩包，打开 `AllChat/AllChat.exe`。桌面窗口需要 Microsoft Edge WebView2 Runtime。
-- Mac：Apple 芯片选择 `macos-arm64`，Intel 选择 `macos-x64`，解压后把 `AllChat.app` 放入应用程序。预览包未经 Apple 公证。
+## 安装与启动
 
-两个版本都内置 Python 服务。项目配置、记录和 `connections.json` 位于 Windows 的 `%LOCALAPPDATA%\AllChat` 或 Mac 的 `~/Library/Application Support/AllChat`。本地 Agent 仍需在该电脑安装并配置。关闭窗口后，已启动的服务会继续处理讨论；重新打开时会连接到它。
+Windows 和 macOS 用户登录 GitHub，进入 [桌面版构建列表](https://github.com/chenmochaos/AllChat/actions/workflows/desktop.yml)，打开一次成功的构建，在 **Artifacts** 下载对应的包。下载后解开两层 ZIP。
 
-桌面预览版面向 Omarchy / Arch Linux x86_64。进入 `desktop` 目录运行 `makepkg -si` 安装后，在应用菜单搜索 **AllChat**。每次打开时，灰阶像素动画会过渡到工作区，点击或按 Esc 可跳过。开启减少动态效果时直接进入工作区。
+| 平台 | 如何打开 |
+| --- | --- |
+| Windows x64 | 下载 `AllChat-windows-x64`，打开 `AllChat/AllChat.exe`。窗口需要 Microsoft Edge WebView2 Runtime。 |
+| macOS · Apple 芯片 | 下载 `AllChat-macos-arm64`，将 `AllChat.app` 拖入「应用程序」。 |
+| macOS · Intel | 下载 `AllChat-macos-x64`，同样将 `AllChat.app` 拖入「应用程序」。 |
+| Omarchy / Arch Linux x86_64 | 在 `desktop` 目录运行 `makepkg -si`，然后在应用菜单打开 **AllChat**。 |
 
-桌面版在用户会话中运行本地服务。关掉窗口后讨论继续，再次打开可查看结果。桌面项目与记录保存在 `~/.local/state/allchat-desktop`（遵循 `XDG_STATE_HOME`）。桌面版和网页源码版共用连接配置。
+Windows 和 macOS 包内置 Python 服务，本地 Agent 需另行安装并配置。macOS 预览包尚未经过 Apple 公证。打开应用时，点击开场动画或按 Esc 即可跳过；开启减少动态效果时会直接进入工作区。
 
-### 网页源在本机启动工作区，选择项目文件夹、参会 Agent 和 BOSS。每家先独立出案，再互评和修订。所有人确认同一份共同稿后，可交给指定 Agent 执行。码版
+<details>
+<summary>在 Linux 上运行网页源码版</summary>
 
 需要 Linux、Python 3.10 或更高版本。系统文件夹选择器使用 Tk。服务和数据库仅依赖 Python 标准库。
 
@@ -37,7 +45,9 @@ python3 server.py
 
 用浏览器打开终端显示的本机地址。点击「创建项目」选择真实目录。也可使用 `python3 server.py --project .` 导入当前目录。端口默认 8787，可用 `--port` 修改。直接打开 `index.html` 仍可体验离线演示，其历史与真实工作区分开。
 
-## 连接
+</details>
+
+## 连接 Agent
 
 | 入口 | 接入条件 |
 | --- | --- |
@@ -51,7 +61,10 @@ python3 server.py
 
 本地扫描也识别 Grok Build、OpenCode、OpenClaw、Hermes、Pi、MiniMax Code、Kimi Code、Antigravity、Oh My Pi、Copilot CLI、WorkBuddy 和 ZCode。这些入口支持通过所配置的桥接或 Parley 参与讨论。配置页列出已发现的入口，并保留一个自定义 API 选项。
 
-服务读取 `~/.config/allchat/connections.json`，也可通过 `--config` 指定文件。只填写需要的项，修改后重启。配置示例：
+<details>
+<summary>配置自定义 API、桥接命令或 Parley</summary>
+
+Windows 的 `connections.json` 位于 `%LOCALAPPDATA%\AllChat`，Mac 的位于 `~/Library/Application Support/AllChat`。Linux 桌面版和网页源码版共用 `~/.config/allchat/connections.json`，也可在启动服务时通过 `--config` 指定文件。只填写需要的项，修改后重启。配置示例：
 
 ```json
 {
@@ -65,9 +78,13 @@ python3 server.py
 
 项目若已安装并配置 Parley CLI，可用 `"parley_agents":{"DeepSeek Harness":"你的参与者编号"}` 委派单次调用。使用上游 `parley agents exec` 的产物检查，AllChat 负责阶段转换。原生 CLI、API 和桥接入口可在同一场讨论混用。API 能处理用户选定的材料和文本交付。需要直接读写本地项目时，请选择具备文件工具的执行端。
 
+</details>
+
 ## 保存与恢复
 
-项目配置和讨论运行状态存入 `~/.local/state/allchat`（遵循 `XDG_STATE_HOME`，可用 `--data-dir` 修改）。每个项目在 `parley-deck/ideas/allchat-<讨论编号>/` 保存提案、互评、个人新版、共同稿、签认和交接记录。AllChat 有自己的工作流状态，未调用上游协议验证器的记录不构成 Parley 严格验证结果。
+每次讨论的提案、互评、个人修订稿、共同稿、签认和交接记录都保存在项目的 `parley-deck/ideas/allchat-<讨论编号>/` 里。AllChat 自行记录工作流状态；Parley 的严格验证结果需要另行调用上游协议验证器。
+
+Windows 和 macOS 的项目配置与运行状态保存在各自的连接配置目录。Linux 桌面版默认保存在 `~/.local/state/allchat-desktop`，网页源码版保存在 `~/.local/state/allchat`，两者都遵循 `XDG_STATE_HOME`。启动服务时可用 `--data-dir` 指定目录。
 
 输入框用于向 BOSS 提问。涉及取舍时使用「补充并继续」登记决定，定稿后也可以「修改要求」。修改方案或名单会触发新的评审和签认。默认最多八轮，配置中可选择不限轮数。
 

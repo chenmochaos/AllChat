@@ -3,6 +3,7 @@ const stages={draft:'独立提案',join:'新成员出案',review:'交叉评审',
   choice:'等待你的取舍',limit:'已达轮数上限',approved:'全员已确认',ended:'用户已结束',execute:'执行中',delivered:'执行 Agent 已回复',ask:'BOSS 解释'};
 let workspace, project, run, view='boss', selectedFolder, selectedVersion='', scanTimers=[];
 let projectId=localStorage.getItem('allchat.live.project'), runId=null, lastRender='';
+let selection=0, readVersion=0, materials='', draftKey=crypto.randomUUID();
 const note=$('.demo-note');
 note.setAttribute('role','status');
 async function api(path,data){
@@ -49,33 +50,30 @@ function agentRail(animate=false){
   });
   if(animate)scanTimers.push(setTimeout(()=>rail.classList.remove('scanning'),entries.length*170+900));
 }
-async function refresh(selectLatest=false){
+async function refresh(){
   workspace=await api('state');
   project=workspace.projects.find(p=>p.id===projectId)||workspace.projects[0];
   projectId=project?.id;
-  if(projectId)localStorage.setItem('allchat.live.project',projectId);
-  const recent=workspace.runs.filter(r=>r.project===projectId);
-  if(selectLatest||!recent.some(r=>r.id===runId))runId=recent[0]?.id;
   await loadRun();
 }
 async function loadRun(){
-  const id=runId;
+  const version=++readVersion, id=runId;
   const data=id?await api('run/'+id):null;
-  if(id!==runId)return;
+  if(version!==readVersion || id!==runId)return;
   run=data;render();
 }
-function chooseProject(id){
-  projectId=id;runId=null;view='boss';selectedVersion='';lastRender='';$('#task').value='';
-  $('#projectPanel').hidden=true;$('#project').setAttribute('aria-expanded','false');
-  return refresh(true);
+function rememberSelection(){
+  if(!projectId)return;
+  localStorage.setItem('allchat.live.project',projectId);
+  localStorage.setItem('allchat.live.chat.'+projectId,runId||'');
 }
-$('#project').onclick=()=>{
-  const box=$('#projectPanel');box.hidden=!box.hidden;$('#project').setAttribute('aria-expanded',String(!box.hidden));
-  const recent=$('#recentProjects');recent.replaceChildren();
-  for(const p of workspace.projects)recent.append(button(p.name+' · '+p.path,guard(()=>chooseProject(p.id)),'entry'));
-};
+async function chooseProject(id,chat=null){
+  selection++;projectId=id;runId=chat;run=null;project=workspace.projects.find(p=>p.id===id);
+  view='boss';selectedVersion='';lastRender='';materials='';draftKey=crypto.randomUUID();
+  $('#task').value='';note.textContent='';rememberSelection();render();await loadRun();
+  if(!runId)$('#task').focus({preventScroll:true});
+}
 $('#addProject').onclick=()=>{
-  $('#projectPanel').hidden=true;$('#project').setAttribute('aria-expanded','false');
   $('#createForm').reset();selectedFolder=null;$('#folderName').textContent='在此电脑上添加文件夹';
   $('#browseFolder span:last-child').textContent='添加';$('#confirmCreate').disabled=true;$('#createProject').showModal();
 };
@@ -91,6 +89,7 @@ $('#browseFolder').onclick=guard(async()=>{
 $('#createForm').onsubmit=guard(async()=>{
   if(!selectedFolder)return;
   const p=await api('projects',{folder:selectedFolder.token,name:$('#createName').value.trim()});
+  if(!workspace.projects.some(item=>item.id===p.id))workspace.projects.unshift(p);
   $('#createProject').close();await chooseProject(p.id);
 });
 $('#config').onclick=()=>{
@@ -116,42 +115,24 @@ $('#config').onclick=()=>{
     await api('prefs',{project:projectId,inherit:true,prefs:workspace.defaults});dialog.close();await refresh();
   }),'entry'));
 };
-$('#newRun').onclick=()=>{
-  if(!project){$('#addProject').click();return;}
-  const body=panel('新讨论'), brief=elem('textarea'),materials=elem('textarea');
-  const prefs=project.prefs||workspace.defaults;
-  brief.rows=3;brief.maxLength=8000;materials.rows=3;materials.maxLength=100000;
-  const label=elem('label','field','你想解决什么问题？'),source=elem('label','field','共享材料（可选）');
-  label.append(brief);source.append(materials);
+$('#attach').onclick=()=>{
+  const body=panel('共享材料'),field=elem('label','field','材料内容'),input=elem('textarea');
+  input.rows=6;input.maxLength=100000;input.value=materials;field.append(input);
   const files=elem('input');files.type='file';files.multiple=true;files.accept='.txt,.md,.json,.csv,.js,.py,.html,.css,.yaml,.toml,.yml';
   files.onchange=guard(async()=>{
-    let text=materials.value;
+    let value=input.value;
     for(const f of files.files){
       if(f.size>400000)throw Error('请选择较小的文本材料。');
-      text+='\n\n'+f.name+'\n'+await f.text();
+      value+='\n\n'+f.name+'\n'+await f.text();
     }
-    if(text.length>100000)throw Error('材料总长度超出十万字符。');
-    materials.value=text;
+    if(value.length>100000)throw Error('材料总长度超出十万字符。');input.value=value;
   });
-  source.append(files);
-  const key=crypto.randomUUID();
-  body.append(elem('p','hint',project.path),label,source,elem('p','hint','参会 · '+prefs.agents.join('、')),button('发起讨论',guard(async()=>{
-    const r=await api('runs',{id:key,project:projectId,title:brief.value,materials:materials.value});
-    runId=r.id;selectedVersion='';view='boss';dialog.close();await refresh();
-  })));brief.focus();
+  body.append(field,files,button('保存材料',()=>{materials=input.value;dialog.close();render();}));
 };
-$('#history').onclick=guard(async()=>{
-  await refresh();
-  const body=panel('项目讨论记录'), rows=workspace.runs.filter(r=>r.project===projectId);
-  for(const r of rows)body.append(button(r.title+' · '+stages[r.stage],guard(async()=>{
-    runId=r.id;selectedVersion='';view='boss';dialog.close();await loadRun();
-  }),'entry'));
-  if(!rows.length)body.append(elem('p','empty','这个项目还没有讨论。'));
-});
 async function act(action,data={}){
   const id=runId;
   const result=await api('action',{id,action,revision:run.plans.at(-1)?.digest,...data});
-  if(id===runId){run=result;render();}
+  if(id===runId){readVersion++;run=result;render();}
 }
 function decide(){
   const body=panel('告诉 BOSS 你的决定'),answer=elem('textarea'),field=elem('label','field',run.plans.at(-1)?.question||'补充要求或说明下轮方向');
@@ -178,44 +159,70 @@ function handoff(){
     await act('handoff',{agent:pick.select.value});dialog.close();
   })));
 }
+function showTranscript(box,r){
+  box.append(bubble('你',r.title,'目标',true),coordinationReply(r));
+  const events=[];
+  function add(time,name,text,label,user=false,jobId=''){
+    events.push({time,name,text,label,user,jobId});
+  }
+  const questionJobs=new Map();
+  for(const [index,j] of r.jobs.entries()){
+    if(j.stage==='ask'){questionJobs.set(j.id.split('/')[1],{j,index});continue;}
+    if(j.status==='superseded')continue;
+    let text=j.text,label=stages[j.stage]+' · 第 '+j.round+' 轮';
+    if(j.status==='failed')text=j.error;
+    else if(j.status!=='done')text=j.status==='queued'?'等待派发…':workingText(r,j);
+    else if(j.stage==='vote')text=j.parsed.approve?'已确认这版共同稿。':j.parsed.objection;
+    else if(j.stage==='merge'){
+      text=[j.parsed.summary||j.parsed.plan,j.parsed.question].filter(Boolean).join('\n\n');
+    }
+    add(j.updated||j.sent||index+1,j.agent,text,label,false,j.id);
+  }
+  for(const [i,q] of r.questions.entries()){
+    const item=questionJobs.get(q.id), job=item?.j;
+    const sent=q.sent??(item?item.index+0.9:r.jobs.length+1+i);
+    add(sent,'你',q.text,'提问',true);
+    add(job?.updated||sent,r.boss,q.answer||job?.error||'收到，正在准备回答…',q.answer?'BOSS':'BOSS · 提问状态');
+  }
+  r.decisions.forEach((d,i)=>add(r.decisionTimes?.[i]??r.jobs.length+1+i,'你',d,'决定',true));
+  for(const event of events.sort((a,b)=>a.time-b.time)){
+    const item=bubble(event.name,event.text,event.label,event.user);
+    if(event.jobId)item.id='job-'+event.jobId;
+    box.append(item);
+  }
+  if(!r.jobs.length && r.stage==='draft'){
+    for(const agent of r.agents)box.append(bubble(agent,'等待派发…','独立提案'));
+  }
+  const sessions=Object.entries(r.sessions).filter(([,id])=>id);
+  if(sessions.length){
+    const details=elem('details','session-ids');details.append(elem('summary','','原生会话编号'));
+    for(const [role,id] of sessions)details.append(elem('p','hint',role+' · '+id));
+    box.append(details);
+  }
+}
 function render(){
-  const signature=JSON.stringify([project,run,view,selectedVersion]);
+  projectTree(workspace.projects,workspace.runs,projectId,runId,(id,chat)=>guard(()=>chooseProject(id,chat))());
+  const signature=JSON.stringify([project,run,runId,view,selectedVersion,materials]);
   if(signature===lastRender)return;
   lastRender=signature;
-  $('#projectName').textContent=project?.name||'项目文件夹';$('#project').title=project?.path||'选择项目';
-  $('#source').textContent='本地工作区';
+  $('#projectName').textContent=project?.name||'工作区';
   const failed=run?.jobs.find(j=>j.status==='failed');
   $('#verdict').textContent=run?(failed?'等待重试':stages[run.stage])+' · 第 '+run.round+' 轮':'';
-  $('#runTitle').textContent=run?.title||(project?'开始一场讨论':'选择项目文件夹');
+  $('#runTitle').textContent=run?.title||(runId?'正在打开会话…':project?'我们要解决什么问题？':'导入项目，开始聊天');
   const box=$('#conversation'),footer=$('#handoff'),members=$('#members');
-  const scroll=box.scrollTop,stick=scroll>0&&box.scrollHeight-box.clientHeight-scroll<30;
+  const scroll=box.scrollTop,stick=box.scrollHeight-box.clientHeight-scroll<36;
   box.replaceChildren();footer.replaceChildren();members.replaceChildren();
-  footer.hidden=true;$('#compose').hidden=!run;
-  document.querySelectorAll('[data-view]').forEach(b=>{b.disabled=!run;b.setAttribute('aria-pressed',String(b.dataset.view===view));});
+  footer.hidden=true;composeMode(!!run);
+  $('#attach').textContent=materials?'材料 ✓':'＋';
+  $('#task').disabled=!project||(!run&&!!runId);
+  $('.send').disabled=$('#task').disabled;
+  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
   if(!run)return;
   for(const [name,host] of [[run.boss,true],...run.agents.map(n=>[n,false])]){
     const member=elem('span',host?'host':'roster-name');member.append(agentIcon(name),(host?'BOSS · ':'')+name);members.append(member);
   }
   const finished=run.jobs.filter(j=>j.status==='done');
-  if(view==='reviews'){
-    for(const j of run.jobs.filter(j=>!['ask','execute'].includes(j.stage))){
-      let text=j.text||({working:'正在处理…',queued:'等待派发',failed:j.error,superseded:'名单已更新'}[j.status]);
-      if(j.stage==='vote'&&j.parsed)text=j.parsed.approve?'已确认当前共同稿，可以执行。':j.parsed.objection;
-      if(j.stage==='merge'&&j.parsed)text=j.parsed.summary||j.parsed.plan;
-      const item=bubble(j.agent,text,stages[j.stage]+' · 第 '+j.round+' 轮');
-      item.id='job-'+j.id;box.append(item);
-      if(j.stage==='review'){
-        const refs=finished.filter(x=>x.agent!==j.agent&&(j.round===1?x.stage==='draft':x.stage==='revise'&&x.round===j.round-1));
-        for(const x of refs)box.append(button('查看 '+x.agent+' 原稿',()=>document.getElementById('job-'+x.id)?.scrollIntoView({block:'nearest'}),'secondary'));
-      }
-    }
-    if(Object.values(run.sessions).some(Boolean)){
-      const details=elem('details'),summary=elem('summary','','原生会话编号');
-      details.append(summary);
-      for(const [role,id] of Object.entries(run.sessions))if(id)details.append(elem('p','hint',role+' · '+id));
-      box.append(details);
-    }
-  }else if(view==='plan'){
+  if(view==='plan'){
     const versions=[...run.plans.map(p=>['共同稿 v'+p.version,p.plan]),...finished.filter(j=>['draft','revise'].includes(j.stage)).map(j=>[j.agent+' v'+(j.stage==='draft'?1:j.round+1),j.text])];
     if(versions.length){
       const current=versions.find(([n])=>n===selectedVersion)||versions[run.plans.length?run.plans.length-1:0];
@@ -223,12 +230,7 @@ function render(){
       pick.select.onchange=()=>{selectedVersion=pick.select.value;render();};box.append(pick.wrap,elem('p','bubble',current[1]));
     }else box.append(elem('p','hint','等待首份提案。'));
   }else{
-    box.append(bubble('你',run.title,'需求',true));
-    for(const p of run.plans)box.append(bubble(run.boss,(p.summary||p.plan)+(p.question?'\n\n'+p.question:''),'BOSS · 共同稿 v'+p.version));
-    for(const d of run.decisions)box.append(bubble('你',d,'决定',true));
-    for(const q of run.questions){box.append(bubble('你',q.text,'提问',true));if(q.answer)box.append(bubble(run.boss,q.answer,'BOSS'));}
-    for(const j of finished.filter(j=>j.stage==='execute'))box.append(bubble(j.agent,j.text,'执行回执'));
-    if(!run.plans.length)box.append(elem('p','hint',stages[run.stage]+' · '+finished.length+' 份回复已保存'));
+    showTranscript(box,run);
   }
   if(failed){
     footer.append(elem('span','',failed.agent+' · '+failed.error),button('重试这一项',guard(()=>act('retry',{job:failed.id}))));
@@ -242,7 +244,22 @@ function render(){
   box.scrollTop=stick?box.scrollHeight:scroll;
 }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;render();});
-$('#compose').onsubmit=guard(async()=>{await act('ask',{text:$('#task').value});$('#task').value='';view='boss';render();});
+$('#compose').onsubmit=guard(async()=>{
+  const task=$('#task'),text=task.value.trim(),at=selection;
+  if(!text||!project)return;
+  note.textContent='';view='boss';
+  if(!runId){
+    note.textContent='正在建立会话…';
+    const r=await api('runs',{id:draftKey,project:projectId,title:text,materials});
+    if(!workspace.runs.some(item=>item.id===r.id))workspace.runs.unshift(r);
+    if(at!==selection){render();return;}
+    runId=r.id;run=r;rememberSelection();foldedProjects.delete(projectId);materials='';
+  }else await act('ask',{text});
+  if(at===selection){
+    if(task.value.trim()===text)task.value='';
+    note.textContent='';render();$('#conversation').scrollTop=$('#conversation').scrollHeight;
+  }
+});
 $('#scanAgents').textContent='识别本机 Agent';
 $('#scanAgents').onclick=guard(async()=>{workspace=await api('state');agentRail(true);});
 note.textContent='';
@@ -251,4 +268,12 @@ async function poll(){
   catch(e){note.textContent=e.message;}
   finally{setTimeout(poll,1200);}
 }
-guard(async()=>{await refresh();agentRail();poll();})();
+guard(async()=>{
+  workspace=await api('state');
+  project=workspace.projects.find(p=>p.id===projectId)||workspace.projects[0];
+  projectId=project?.id;
+  const saved=localStorage.getItem('allchat.live.chat.'+projectId);
+  const recent=workspace.runs.filter(r=>r.project===projectId);
+  runId=saved===''?null:(recent.find(r=>r.id===saved)||recent[0])?.id||null;
+  await loadRun();agentRail();poll();
+})();
