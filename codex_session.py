@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import os
 import shutil
+import sys
 from queue import Queue, Empty
 import subprocess
 import threading
@@ -16,6 +17,10 @@ def control_socket(config):
 
 def launch_command(config):
     bundled = shutil.which("/usr/lib/chatgpt/resources/codex")
+    if sys.platform == "darwin":
+        bundled = next((str(path) for root in (Path("/Applications"),Path.home()/"Applications")
+                        for app in ("Codex.app","ChatGPT.app")
+                        if os.access(path:=root/app/"Contents/Resources/codex",os.X_OK)),None)
     cli = shutil.which("codex") or bundled
     socket = control_socket(config)
     if cli and socket.is_socket():
@@ -30,7 +35,8 @@ def turn(config,project,session,prompt,execute):
     if not argv:
         raise ValueError("已安装桌面端，尚未找到 Codex 会话服务。")
     process=subprocess.Popen(argv,
-                             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+                             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,
+                             encoding="utf-8",creationflags=subprocess.CREATE_NO_WINDOW if os.name=="nt" else 0)
     inbox=Queue()
     deadline=time.monotonic()+600
 

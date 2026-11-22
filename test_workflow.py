@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from pathlib import Path
 import tempfile
 import threading
@@ -126,13 +128,13 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(merged_preferences(prefs)["agents"], ["ChatGPT"])
         with self.assertRaises(ValueError):
             preferences(prefs)
-        config = {"bridges":{"Codex 桌面端":["/bin/true"]}}
+        config = {"bridges":{"Codex 桌面端":[sys.executable]}}
         result = connections.scan(config)
         self.assertNotIn("Codex 桌面端",result)
         self.assertTrue(result["ChatGPT"]["ready"])
         with patch("connections.command", return_value='{"text":"reply"}') as call:
             connections.invoke("ChatGPT","task",str(self.path),None,[],config)
-            self.assertEqual(call.call_args.args[0], ["/bin/true"])
+            self.assertEqual(call.call_args.args[0], [sys.executable])
 
     def test_unrelated_dsh_and_native_resume(self):
         with patch("connections.shutil.which",return_value="/test/dsh"), patch("connections.subprocess.run") as probe:
@@ -156,13 +158,14 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(merged, dict(agents=["Gemini CLI"], boss="", limit=8))
 
     def test_scan_external_agent_and_ignore_inactive_shim(self):
-        binary=self.path/"zcode"
+        binary=self.path/("zcode.exe" if os.name=="nt" else "zcode")
         binary.write_text("#!/bin/sh\n")
         binary.chmod(0o700)
         mise=self.path/"mise"
         mise.write_text("#!/bin/sh\nexit 1\n")
         mise.chmod(0o700)
-        (self.path/"omp").symlink_to(mise)
+        if os.name!="nt":
+            (self.path/"omp").symlink_to(mise)
         with patch.dict("os.environ",PATH=str(self.path)), patch("connections.harness_command",return_value=None):
             caps=connections.scan({})
             self.assertTrue(caps["ZCode"]["installed"])

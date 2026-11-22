@@ -301,7 +301,7 @@ class Coordinator:
         records.append(("discussion.json",encode(self.public(r))))
         for filename,content in records:
             tmp=folder/("."+uuid.uuid4().hex)
-            with tmp.open("x") as out:out.write(content)
+            with tmp.open("x",encoding="utf-8") as out:out.write(content)
             os.replace(tmp,folder/filename)
 
     @staticmethod

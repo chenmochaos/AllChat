@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import urllib.request
 import codex_session
@@ -90,10 +91,21 @@ def scan(config):
                  *(os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")]
     launchers = {entry.stem.casefold(): entry.name for directory in data_dirs if directory
                  for entry in (Path(directory)/"applications").glob("*.desktop") if entry.is_file()}
+    if sys.platform == "darwin":
+        for directory in (Path("/Applications"),Path.home()/"Applications"):
+            launchers.update({item.stem.casefold():item.name for item in directory.glob("*.app")})
+    elif os.name == "nt":
+        for variable in ("APPDATA","ProgramData"):
+            if os.environ.get(variable):
+                directory=Path(os.environ[variable])/"Microsoft/Windows/Start Menu/Programs"
+                launchers.update({item.stem.casefold():item.name for item in directory.rglob("*.lnk")})
     result = {}
     for name, (exes, desktops) in CATALOG.items():
         bridge = configured(config, "bridges", name)
-        launcher = next((launchers[entry] for entry in desktops if entry in launchers), None)
+        aliases = desktops
+        if (os.name == "nt" or sys.platform == "darwin") and desktops:
+            aliases += ("claude" if name == "Claude Desktop" else name.casefold(),)
+        launcher = next((launchers[entry] for entry in aliases if entry in launchers), None)
         detected = launcher or local_command(exes)
         harness = harness_command() if name == "DeepSeek Harness" else None
         detected = harness or detected
@@ -127,12 +139,23 @@ def scan(config):
 
 
 def command(argv, prompt, cwd):
+    executable = shutil.which(argv[0])
+    if not executable:
+        raise ValueError("找不到已配置的 Agent 命令。")
+    argv=[executable,*argv[1:]]
     proc = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True, start_new_session=True)
+                            stderr=subprocess.PIPE, text=True, encoding="utf-8",errors="replace",
+                            start_new_session=os.name!="nt",
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name=="nt" else 0)
     try:
         out, err = proc.communicate(prompt, timeout=600)
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)
+        if os.name=="nt":
+            subprocess.run(["taskkill","/PID",str(proc.pid),"/T","/F"],capture_output=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+            proc.kill()
+        else:
+            os.killpg(proc.pid, signal.SIGKILL)
         proc.communicate()
         raise ValueError("调用超时，请先核对原生会话再重试。") from None
     if proc.returncode:
@@ -155,7 +178,7 @@ def invoke(name, prompt, project, session, history, config, execute=False):
             command(["parley","agents","exec","--dir",project,"--agent",parley_id,"--prompt-file","-",
                      "--artifact",target,"--json","--yes"],full_prompt,project)
             if output.is_symlink():raise ValueError("Agent 返回的产物路径无效。")
-            return output.read_text(),None
+            return output.read_text(encoding="utf-8"),None
     bridge = configured(config, "bridges", name)
     if bridge:
         data = {"prompt": prompt, "session": session, "project": project,

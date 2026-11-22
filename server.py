@@ -1,6 +1,5 @@
 """Run AllChat locally with: python3 server.py"""
 import argparse
-import fcntl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import mimetypes
@@ -43,11 +42,18 @@ def preferences(data):
 
 
 class Application:
-    def __init__(self,directory,config):
+    def __init__(self,directory,config,folder_picker=None):
         self.config=config
+        self.folder_picker=folder_picker
         self.store=Store(directory)
         self.guard=(directory/"server.lock").open("a")
-        fcntl.flock(self.guard,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if os.name == "nt":
+            import msvcrt
+            self.guard.seek(0)
+            msvcrt.locking(self.guard.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(self.guard,fcntl.LOCK_EX|fcntl.LOCK_NB)
         self.engine=Coordinator(self.store,config)
         self.token=secrets.token_urlsafe(32)
         self.folders={}
@@ -80,11 +86,14 @@ class Application:
 
     def post(self,path,d):
         if path=="/api/folder":
-            picker=ROOT/"pick_folder.py"
-            args=[str(picker)] if picker.is_file() else ["-c",PICKER]
-            proc=subprocess.run([sys.executable,*args],capture_output=True,text=True,timeout=300)
-            if proc.returncode:raise ValueError("无法显示系统文件夹选择器。请在桌面终端启动服务，或使用 --project 选择目录。")
-            value=proc.stdout.strip()
+            if self.folder_picker:
+                value=self.folder_picker()
+            else:
+                picker=ROOT/"pick_folder.py"
+                args=[str(picker)] if picker.is_file() else ["-c",PICKER]
+                proc=subprocess.run([sys.executable,*args],capture_output=True,text=True,timeout=300)
+                if proc.returncode:raise ValueError("无法显示系统文件夹选择器。请在桌面终端启动服务，或使用 --project 选择目录。")
+                value=proc.stdout.strip()
             if not value:return {}
             token=uuid.uuid4().hex
             with self.store.lock:self.folders[token]=value
@@ -150,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:return self.send(404,{"error":"记录不存在"})
             return self.send(404,{})
         if path in ("/","/index.html"):
-            page=(ROOT/"index.html").read_text().replace('src="workspace.js"','src="live.js"')
+            page=(ROOT/"index.html").read_text(encoding="utf-8").replace('src="workspace.js"','src="live.js"')
             page=page.replace("<head>",f'<head><meta name="allchat-token" content="{self.server.app.token}">')
             return self.send(200,page.encode(),"text/html; charset=utf-8")
         file=(ROOT/path.lstrip("/")).resolve()

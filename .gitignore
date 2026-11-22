@@ -6,3 +6,4 @@ __pycache__/
 /desktop/pkg/
 /desktop/*.pkg.tar.*
 /dist/
+/build/

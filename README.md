@@ -4,6 +4,13 @@
 
 ## 启动
 
+Windows 和 macOS 预览包可在仓库 **Actions → Desktop packages → 对应构建 → Artifacts** 下载。解压到本地后：
+
+- Windows x64：解压完整的 Windows 压缩包，打开 `AllChat/AllChat.exe`。桌面窗口需要 Microsoft Edge WebView2 Runtime。
+- Mac：Apple 芯片选择 `macos-arm64`，Intel 选择 `macos-x64`，解压后把 `AllChat.app` 放入应用程序。预览包未经 Apple 公证。
+
+两个版本都内置 Python 服务。项目配置、记录和 `connections.json` 位于 Windows 的 `%LOCALAPPDATA%\AllChat` 或 Mac 的 `~/Library/Application Support/AllChat`。本地 Agent 仍需在该电脑安装并配置。关闭窗口后，已启动的服务会继续处理讨论；重新打开时会连接到它。
+
 桌面预览版面向 Omarchy / Arch Linux x86_64。进入 `desktop` 目录运行 `makepkg -si` 安装后，在应用菜单搜索 **AllChat**。每次打开时，灰阶像素动画会过渡到工作区，点击或按 Esc 可跳过。开启减少动态效果时直接进入工作区。
 
 桌面版在用户会话中运行本地服务。关掉窗口后讨论继续，再次打开可查看结果。桌面项目与记录保存在 `~/.local/state/allchat-desktop`（遵循 `XDG_STATE_HOME`）。桌面版和网页源码版共用连接配置。
