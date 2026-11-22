@@ -6,6 +6,7 @@
   <title>AllChat — Multi-Agent Planning</title>
   <link rel="stylesheet" href="styles.css">
   <script defer src="app.js"></script>
+  <script defer src="ui.js"></script>
   <script defer src="workspace.js"></script>
 </head>
 <body>
@@ -40,7 +41,7 @@
     </section>
     <section class="workspace" id="workspace" aria-labelledby="workspaceTitle">
       <section class="local-agents" lang="zh-CN" aria-labelledby="localAgentsTitle">
-        <div class="local-agents-head"><h3 id="localAgentsTitle">本地 Agent</h3><span id="scanState" role="status">本机快照 · 4 个入口</span><button id="scanAgents" type="button">预览识别</button></div>
+        <div class="local-agents-head"><h3 id="localAgentsTitle">本地 Agent</h3><span id="scanState" role="status"></span><button id="scanAgents" type="button">预览识别</button></div>
         <div class="agent-rail" id="agentRail" aria-label="本机检测快照"></div>
       </section>
       <div class="workspace-heading"><h2 id="workspaceTitle">Review workspace</h2><a href="#home" class="back-top">BACK TO TOP ↑</a></div>

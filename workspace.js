@@ -1,9 +1,3 @@
-const catalog = {
-  'ChatGPT': ['OpenAI', 'openai'], 'Codex 桌面端': ['OpenAI', 'codex'],
-  'Codex CLI': ['OpenAI', 'codex'], 'Claude Desktop': ['Anthropic', 'claude'],
-  'Claude Code': ['Anthropic', 'claude'], 'DeepSeek Harness': ['DeepSeek', 'deepseek'],
-  'Gemini': ['Google', 'gemini'], '自定义 API': ['API', 'API']
-};
 const photo = {
   question: '相同照片出现在两个相册里，要直接移走其中一份吗？',
   summary: '大家都同意先找出内容完全一样的照片。分歧在于怎么处理：直接移走更省事，但你以后打开其中一个相册，可能就找不到那张照片了。',
@@ -22,7 +16,7 @@ const general = {
   drafts: ['先确定交付物，整理一份可以核对的清单。', '先做一个小样例，确认方向再展开。', '列出完成标准，让执行者可以逐项核查。'],
   reviews: ['要说清用户在哪一步确认。', '先确定是分批交付还是一次交付。', '把验收条件写成用户能检查的结果。']
 };
-const defaults = {agents:['Codex CLI','Claude Code','Gemini'], boss:'Claude Desktop', limit:'8'};
+const defaults = {agents:['Codex CLI','Claude Code','DeepSeek Harness'], boss:'Claude Code', limit:'8'};
 const sampleProject = '示例项目/照片整理';
 function makeRun(project, title, prefs, sample = false) {
   return {id: crypto.randomUUID(), project, title, agents:[...prefs.agents], boss:prefs.boss,
@@ -51,6 +45,11 @@ try {
   }
 } catch { /* Keep the prototype usable without browser storage. */ }
 state.projectPrefs = Object.assign(Object.create(null), state.projectPrefs);
+for(const prefs of [state.prefs,...Object.values(state.projectPrefs)].filter(Boolean)){
+  const current=name=>({'Codex 桌面端':'ChatGPT','Gemini':'Gemini CLI'}[name]||name);
+  prefs.agents=[...new Set(prefs.agents.filter(n=>n!=='DeepSeek API').map(current))];
+  prefs.boss=prefs.boss==='DeepSeek API'?'':current(prefs.boss);
+}
 state.projectInfo = Object.assign(Object.create(null), state.projectInfo);
 function projectInfo(id=state.project) {
   return state.projectInfo[id] || {name:id.split('/').filter(Boolean).at(-1)||id,folder:id};
@@ -62,20 +61,9 @@ function save() {
 function activeRun() { return state.runs.find(r => r.project === state.project && r.id === state.active[state.project]); }
 function fixture(r) { return r.sample ? photo : general; }
 // Captured from the workstation's command paths and installed desktop entries.
-const detected = new Set(['ChatGPT','Claude Desktop','Codex CLI','Claude Code']);
-const localAgents = Object.keys(catalog).filter(name=>name!=='自定义 API');
-function agentIcon(name) {
-  const id=catalog[name]?.[1];
-  if (!id || id==='API') {
-    const fallback=elem('span','agent-symbol api-symbol','{ }');
-    fallback.setAttribute('aria-hidden','true');
-    return fallback;
-  }
-  const icon=elem('img','agent-symbol');
-  icon.src='assets/icons/'+id+'.svg';
-  icon.alt='';
-  return icon;
-}
+const detected = new Set(['ChatGPT','Claude Desktop','Codex CLI','Claude Code','DeepSeek Harness']);
+const localAgents = Object.keys(catalog).filter(name=>!name.endsWith('API'));
+const demoChoices = Object.keys(catalog).filter(name=>detected.has(name)||name==='自定义 API');
 function showSnapshot(animate) {
   const rail=$('#agentRail');
   rail.replaceChildren();
@@ -111,30 +99,16 @@ $('#scanAgents').onclick=()=>{
   },(localAgents.length-1)*190+360+720);
 };
 showSnapshot(false);
-const dialog = $('#panel');
-function panel(title) {
-  $('#panelTitle').textContent = title;
-  const body = $('#panelBody');
-  body.replaceChildren();
-  if (!dialog.open) dialog.showModal();
-  return body;
-}
-$('#close').onclick = () => dialog.close();
-function selectField(label, values, value) {
-  const wrap = elem('label','field',label);
-  const select = elem('select');
-  for (const item of values) select.append(new Option(item, item, false, item === value));
-  wrap.append(select); return {wrap, select};
-}
 function chooseAgents(body, prefs, onSave, caption) {
   const box = elem('div','agent-list');
-  const inputs = Object.entries(catalog).map(([name,[provider]]) => {
+  const inputs = demoChoices.map(name => {
+    const [provider]=catalog[name];
     const row = elem('label','agent-option');
     const input = elem('input'); input.type = 'checkbox'; input.value = name; input.checked = prefs.agents.includes(name);
     row.append(agentIcon(name),elem('span','',name),elem('small','',provider),input);
     box.append(row); return input;
   });
-  const boss = selectField('BOSS 主持', Object.keys(catalog), prefs.boss);
+  const boss = selectField('BOSS 主持', demoChoices, prefs.boss);
   const limit = selectField('互评轮数上限', ['6','8','不限'], prefs.limit);
   const btn = button(caption, () => onSave({agents:inputs.filter(i=>i.checked).map(i=>i.value), boss:boss.select.value, limit:limit.select.value}));
   function validate() { btn.disabled = inputs.filter(i=>i.checked).length<2; btn.textContent=btn.disabled?'互评至少需要两位 Agent':caption; }
@@ -249,17 +223,6 @@ function phase(r) {
   const elapsed=Date.now()-r.started;
   return elapsed<1000?'独立出案':elapsed<2300?'交叉评审':'等你决定';
 }
-function bubble(name, text, label='', user=false) {
-  const row=elem('div','message '+(user?'user':'assistant'));
-  if(!user) {
-    const face=elem('span','avatar');
-    face.append(agentIcon(name));
-    row.append(face);
-  }
-  const content=elem('div','message-content'), head=elem('div','message-name',name);
-  head.append(elem('span','message-label',label));
-  content.append(head,elem('p','bubble',text)); row.append(content); return row;
-}
 function setView(next){ view=next; render(); }
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 function decide(r,choice) {
@@ -327,7 +290,7 @@ function planView(box,r,status) {
     elem('p','',v===1?f.question:f.criteria[r.choice]));
 }
 function handoff(r){
-  const body=panel('交给执行 Agent'), pick=selectField('接收方',Object.keys(catalog),'DeepSeek Harness');
+  const body=panel('交给执行 Agent'), pick=selectField('接收方',demoChoices,'DeepSeek Harness');
   body.append(elem('p','hint',projectInfo().name+' · 共同稿 v2'),elem('h3','',r.title),elem('p','',fixture(r).outcomes[r.choice]),pick.wrap,
     button('模拟交接',()=>{r.handoff=pick.select.value;save();dialog.close();render();}));
 }
