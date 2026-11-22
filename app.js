@@ -1,26 +1,4 @@
 const $ = selector => document.querySelector(selector);
-const proposalDelay = 600;
-const reviewDelay = 650;
-const agents = {
-  Codex: ['›_', '每位模型的提案单独保存。先完成的可以直接读，别让整个讨论等最慢的一位。'],
-  Claude: ['✳', '先定义刷新时要恢复的状态。正在生成、已完成和失败都应该分开显示。'],
-  Gemini: ['✧', '可以给每次讨论一个固定标识，刷新后从同一条记录读回已有的提案。'],
-  DeepSeek: ['≈', '加一个部分失败的用例：一位模型失败时，其他模型已交的提案仍能打开。']
-};
-const prior = {
-  id: 'sample', title: '双模型提案页如何处理部分失败？', models: ['Codex', 'Claude'],
-  summaries: ['每个模型独立显示进度。保留已完成的提案和失败原因，刷新后可以接着阅读。', '从 Parley 的运行文件恢复页面。即使一份提案缺失或解析失败，另一份仍然能展开阅读。']
-};
-const example = {id:'annotated-example', title:'中断后，如何继续一次讨论？', models:['Codex','Gemini','DeepSeek','Claude']};
-const key = 'allchat.workspace.v1';
-let workspace = {models: example.models, runs: [], active: example.id};
-try {
-  const saved = JSON.parse(localStorage.getItem(key));
-  if (saved && Array.isArray(saved.runs) && Array.isArray(saved.models)) workspace = saved;
-} catch { /* Storage may be unavailable for local files. */ }
-function save() {
-  try { localStorage.setItem(key, JSON.stringify(workspace)); } catch { /* Keep the session usable in memory. */ }
-}
 function elem(tag, cls, text) {
   const item = document.createElement(tag);
   if (cls) item.className = cls;
@@ -33,269 +11,43 @@ function button(label, action, cls = 'primary') {
   item.onclick = action;
   return item;
 }
-function portrait(name) {
-  const image = elem('img', 'portrait');
-  image.src = 'assets/icons/' + name.toLowerCase() + '.svg';
-  image.alt = '';
-  return image;
-}
-function openPanel(title) {
-  $('#panelTitle').textContent = title;
-  $('#panelBody').replaceChildren();
-  $('#panel').showModal();
-  return $('#panelBody');
-}
-$('#close').onclick = () => $('#panel').close();
-function updateConfig() {
-  $('#composeModels').replaceChildren(...workspace.models.map(portrait));
-  $('#config').title = '参会模型：' + workspace.models.join('、');
-}
-$('#config').onclick = () => {
-  const body = openPanel('讨论设置');
-  const checks = Object.keys(agents).map(name => {
-    const label = elem('label', 'option');
-    const input = elem('input');
-    input.type = 'checkbox'; input.checked = workspace.models.includes(name); input.value = name;
-    label.append(input, portrait(name), name); body.append(label);
-    return input;
-  });
-  const submit = button('保存设置', () => {
-    workspace.models = checks.filter(item => item.checked).map(item => item.value);
-    save(); updateConfig(); $('#panel').close();
-  });
-  function validate() {
-    submit.disabled = checks.filter(item => item.checked).length < 2;
-    submit.textContent = submit.disabled ? '至少选两个模型' : '保存设置';
-  }
-  checks.forEach(input => input.onchange = validate); validate(); body.append(submit);
-};
-$('#history').onclick = () => {
-  const body = openPanel('历史记录');
-  for (const run of [...workspace.runs, example, prior]) {
-    body.append(button(run.title, () => {
-      workspace.active = run.id; revisionChoice = null; save(); $('#panel').close(); showView(false); render();
-    }, 'entry'));
-  }
-};
-let lastView = '';
-let timer;
-// Replay fixture votes in arrival order. Each new plan revision has its own ballot.
-function demoReview(models, elapsed) {
-  const votes = {};
-  let revision = 1;
-  let arrived = Math.max(0, Math.floor((elapsed - models.length * proposalDelay) / reviewDelay));
-  for (const version of [1, 2]) {
-    if (!arrived) break;
-    revision = version;
-    for (const model of models) delete votes[model];
-    for (const model of models) {
-      if (!arrived) break;
-      votes[model] = version === 1 && model === models.at(-1) ? '异常恢复缺少验收条件' : '无异议，可执行';
-      arrived--;
+function drawWordmark() {
+  // Integer-grid outlines keep the stepped corners crisp at every display size.
+  const outlines = {
+    A: ['5,1 17,1 17,24 12,28 12,16 6,16 6,25 1,28 1,16 0,16 0,14 1,13 1,7', '6,7 8,5 12,5 12,12 6,12'],
+    L: ['2,4 7,0 7,22 13,22 16,19 16,26 5,26 2,29'],
+    C: ['6,1 17,1 17,8 12,12 12,5 8,5 6,7 6,22 11,22 12,21 12,18 17,14 17,23 14,26 1,26 1,7'],
+    H: ['2,4 7,0 7,12 13,12 13,4 18,0 18,23 13,28 13,16 7,16 7,25 2,29 2,16 0,16 0,14 2,12'],
+    T: ['4,1 20,1 20,4 17,7 17,5 13,5 13,24 8,29 8,5 4,5 0,9 0,5']
+  };
+  const canvas = $('#heroWordmark');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const word = $('#heroTitle span').textContent.toUpperCase();
+  const widths = { A:20, L:18, C:20, H:21, T:21 };
+  canvas.width = [...word].reduce((sum, letter) => sum + widths[letter], 0);
+  canvas.height = 30;
+  const tones = ['#d4d4d4', '#afafaf', '#8d8d8d', '#5a5a5a', '#2f2f2f'];
+  let offset = 0;
+  for (const letter of word) {
+    const path = new Path2D();
+    for (const outline of outlines[letter]) {
+      outline.split(' ').forEach((pair, i) => {
+        const [x,y] = pair.split(',').map(Number);
+        if (i === 0) path.moveTo(x,y);
+        else path.lineTo(x,y);
+      });
+      path.closePath();
     }
-  }
-  return {revision, votes, done: models.every(model => votes[model] === '无异议，可执行')};
-}
-let revisionChoice = null;
-let displayedRun;
-const conversation = $('#conversation');
-const acceptance = '刷新后，已完成的提案仍可打开；未完成的参与者各自保留原状态。';
-const objection = '如果刷新时还有模型没返回，已经提交的提案会保留吗？需要把这个场景写进验收条件。';
-
-function showView(plan) {
-  $('#plan').hidden = !plan;
-  conversation.hidden = plan;
-  $('#showChat').setAttribute('aria-pressed', String(!plan));
-  $('#showPlan').setAttribute('aria-pressed', String(plan));
-}
-$('#showChat').onclick = () => showView(false);
-$('#showPlan').onclick = () => showView(true);
-
-function message(kind, author, text, label = '') {
-  const item = elem('div', 'message ' + kind);
-  const content = elem('div', 'message-content');
-  const name = elem('div', 'message-name', author);
-  if (kind === 'assistant') {
-    const avatar = elem('span', 'avatar');
-    avatar.append(portrait(author));
-    item.append(avatar);
-    item.dataset.author = author;
-    item.tabIndex = -1;
-  }
-  if (label) name.append(elem('span', 'message-label', label));
-  content.append(name, elem('p', 'bubble', text));
-  item.append(content);
-  return item;
-}
-
-function render() {
-  clearTimeout(timer);
-  const run = [...workspace.runs, prior].find(item => item.id === workspace.active) || example;
-  const archive = run.id === prior.id;
-  const preview = run.id === example.id;
-  const live = !archive && !preview && Boolean(run.consensusDemo);
-  const total = run.models.length;
-  const elapsed = live ? Math.max(0, Date.now() - run.started) : 0;
-  const received = live ? Math.min(total, Math.floor(elapsed / proposalDelay)) : total;
-  const endOfReview = version => total * (proposalDelay + reviewDelay * version);
-  const current = demoReview(run.models, preview ? endOfReview(1) : elapsed);
-  const available = preview ? 2 : current.revision;
-  const version = Math.min(revisionChoice || current.revision, available);
-  const ballot = preview || version < current.revision ? demoReview(run.models, endOfReview(version)) : current;
-  const stateKey = JSON.stringify([run.id, received, current, version, run.handoff]);
-
-  if (stateKey !== lastView) {
-    const changedRun = displayedRun !== run.id;
-    const nearEnd = !conversation.hidden && conversation.scrollHeight - conversation.clientHeight - conversation.scrollTop < 70;
-    const focusedMember = $('#members').contains(document.activeElement) ? document.activeElement.dataset.name : '';
-    displayedRun = run.id;
-    lastView = stateKey;
-
-    $('#runTitle').textContent = run.title;
-    $('#source').textContent = archive ? '实测归档' : preview ? '评审示例' : '本地演示';
-    $('#memberCount').textContent = total + ' 位 AI';
-    const acknowledged = Object.values(current.votes).filter(vote => vote === '无异议，可执行').length;
-    $('#verdict').textContent = archive ? '首轮已完成' : preview ? '方案修订回放' : !live ? '历史讨论' :
-      current.done ? '全员确认，可执行' : received < total ? '独立提案 · ' + received + ' / ' + total :
-      '评审 v' + current.revision + ' · ' + acknowledged + ' / ' + total + ' 已确认';
-
-    const messages = [
-      message('user', '需求', preview ? '刷新后怎么继续上一次讨论？请确定页面应该恢复哪些内容。' : run.title),
-      elem('div', 'stage', '独立提案')
-    ];
-    run.models.slice(0, received).forEach((name, i) => {
-      messages.push(message('assistant', name, archive ? prior.summaries[i] : agents[name][1]));
-    });
-
-    const lastRevision = preview ? version : current.revision;
-    if (preview || (live && received === total)) {
-      for (let n = 1; n <= lastRevision; n++) {
-        const review = n === lastRevision && !preview ? current : demoReview(run.models, endOfReview(n));
-        const divider = elem('div', 'stage', '方案评审 · v' + n);
-        messages.push(divider);
-        if (n > 1) messages.push(elem('p', 'change', acceptance));
-        for (const [name, vote] of Object.entries(review.votes)) {
-          const approved = vote === '无异议，可执行';
-          messages.push(message('assistant', name, approved ? '当前方案没有歧义，可以按这版执行。' : objection,
-            (approved ? '已确认' : '有异议') + ' · v' + n));
-        }
-        if (review.done) messages.push(elem('div', 'stage', '评审结束 · 全员已确认 v' + n));
+    for (let y=0; y<30; y++) {
+      for (let x=0; x<widths[letter]; x++) {
+        if (!ctx.isPointInPath(path,x+0.5,y+0.5,'evenodd')) continue;
+        const band = y < 6 ? 0 : y < 12 ? 1 : y < 19 ? 2 : y < 26 ? 3 : 4;
+        ctx.fillStyle = tones[band];
+        ctx.fillRect(offset+x,y,1,1);
       }
     }
-    if (live && !current.done) {
-      const waiting = run.models.find((name, index) => received < total ? index >= received : !current.votes[name]);
-      const typing = elem('p', 'typing', waiting ? waiting + ' 正在' + (received < total ? '拟定提案' : '审查方案') : '正在修订方案');
-      const dots = elem('span', 'dots');
-      dots.setAttribute('aria-hidden', 'true');
-      dots.append(elem('i'), elem('i'), elem('i'));
-      typing.append(dots);
-      messages.push(typing);
-    }
-
-    const keep = changedRun ? 0 : [...conversation.children].findIndex((node, i) => !messages[i] || !node.isEqualNode(messages[i]));
-    const firstChange = keep < 0 ? conversation.children.length : keep;
-    while (conversation.children.length > firstChange) conversation.lastElementChild.remove();
-    conversation.append(...messages.slice(firstChange));
-
-    const members = run.models.map(name => {
-      const member = button('', () => {
-        showView(false);
-        const last = [...conversation.querySelectorAll('[data-author]')].findLast(item => item.dataset.author === name);
-        if (!last) return;
-        last.scrollIntoView({block:'nearest', behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
-        last.focus({preventScroll:true});
-      }, 'member');
-      member.dataset.name = name;
-      member.append(portrait(name), elem('span', '', name));
-      return member;
-    });
-    $('#members').replaceChildren(...members);
-    if (focusedMember) members.find(member => member.dataset.name === focusedMember)?.focus({preventScroll:true});
-
-    $('#versions').textContent = available > 1 ? '· v' + version : '';
-    const planBody = $('#planBody');
-    const versionRow = elem('div', 'switch');
-    for (let n = 1; n <= available; n++) {
-      const tab = button('v' + n, () => {
-        revisionChoice = n;
-        render();
-        $('#planBody .switch [aria-pressed="true"]')?.focus({preventScroll:true});
-      }, 'version');
-      tab.setAttribute('aria-pressed', String(n === version));
-      versionRow.append(tab);
-    }
-    const title = elem('div','plan-head');
-    title.append(elem('h2','','方案正文'), versionRow);
-    planBody.replaceChildren(title);
-    if (archive || (!preview && !live)) {
-      planBody.append(elem('p','','这次记录包含独立提案。'));
-    } else if (received < total) {
-      planBody.append(elem('p','','正在收集独立提案。'));
-    } else {
-      planBody.append(elem('h3','','按模型恢复讨论状态'), elem('p','','分别保存每位模型的提案和进度，刷新时按讨论记录加载。'),
-        elem('h3','','验收条件'), elem('p','',version === 1 ? '重新打开页面后，恢复上一次讨论。' : acceptance));
-      if (Object.values(ballot.votes).some(vote => vote !== '无异议，可执行')) planBody.append(elem('p','plan-status','待解决 · ' + objection));
-      if (ballot.done) planBody.append(elem('p','plan-status','已确认 · ' + total + ' 位模型同意 v' + version + ' 可执行'));
-    }
-
-    const handoff = $('#handoff');
-    const ready = live && current.done;
-    handoff.hidden = !ready && !run.handoff;
-    handoff.replaceChildren();
-    if (run.handoff) handoff.append(elem('p','','执行交接草稿 · DeepSeek'));
-    else if (ready) handoff.append(elem('span','','最终方案 v' + current.revision), button('生成执行交接', () => {
-      run.handoff = true; save(); render();
-    }));
-    if (changedRun) conversation.scrollTop = 0;
-    else if (live && nearEnd) conversation.scrollTop = conversation.scrollHeight;
-  }
-  if (live && !current.done) timer = setTimeout(render, 150);
-}
-
-$('#compose').onsubmit = event => {
-  event.preventDefault();
-  const title = $('#task').value.trim();
-  if (!title) { $('#task').focus(); return; }
-  const now = Date.now();
-  const run = {id: String(now), started: now, title, models: [...workspace.models], consensusDemo: true};
-  revisionChoice = null;
-  workspace.runs.unshift(run);
-  workspace.active = run.id;
-  save();
-  $('#task').value = '';
-  showView(false);
-  render();
-};
-function drawWordmark() {
-  const glyphs = {
-    A: ['0011100', '0111110', '1110111', '1100011', '1100011', '1111111', '1111111', '1100011', '1100011', '1100011'],
-    L: ['1100000', '1100000', '1100000', '1100000', '1100000', '1100000', '1100000', '1100000', '1111111', '0111111'],
-    C: ['0011110', '0111111', '1110000', '1100000', '1100000', '1100000', '1100000', '1110000', '0111111', '0011110'],
-    H: ['1100011', '1100011', '1100011', '1100011', '1111111', '1111111', '1100011', '1100011', '1100011', '1100011'],
-    T: ['1111111', '1111111', '0011100', '0011100', '0011100', '0011100', '0011100', '0011100', '0011100', '0011100']
-  };
-  const word = $('#heroTitle span').textContent.toUpperCase();
-  const canvas = $('#heroWordmark');
-  const context = canvas.getContext('2d');
-  if (!context) return;
-  canvas.width = word.length * 9 - 1;
-  canvas.height = 11;
-  const bands = ['#d4d4d4', '#d4d4d4', '#d4d4d4', '#afafaf', '#8d8d8d',
-    '#8d8d8d', '#5a5a5a', '#5a5a5a', '#2f2f2f', '#2f2f2f'];
-
-  for (const [index, letter] of [...word].entries()) {
-    glyphs[letter].forEach((row, y) => {
-      context.fillStyle = '#2f2f2f';
-      [...row].forEach((pixel, x) => {
-        if (pixel === '1') context.fillRect(index * 9 + x + 1, y + 1, 1, 1);
-      });
-    });
-    glyphs[letter].forEach((row, y) => {
-      context.fillStyle = bands[y];
-      [...row].forEach((pixel, x) => {
-        if (pixel === '1') context.fillRect(index * 9 + x, y, 1, 1);
-      });
-    });
+    offset += widths[letter];
   }
   canvas.hidden = false;
 }
@@ -392,5 +144,3 @@ function animateHero() {
 
 drawWordmark();
 animateHero();
-updateConfig();
-render();
