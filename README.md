@@ -1,8 +1,8 @@
 # ![AllChat · Multi-agent planning automation](docs/readme-intro.gif)
 
-让多个 AI 在同一个项目里各自出方案、互相挑问题。**有分歧时由你拍板，全员确认后由你选 Agent 执行。**
+AllChat 是一个在 T3 Code 中使用的多 Agent 方案评审 Skill。各个 Agent 先独立出方案，再互相挑问题。BOSS 把需要你拍板的取舍讲清楚。**只有全员确认同一版方案，才交给你选的 Agent 执行。**
 
-[下载桌面预览版](https://github.com/chenmochaos/AllChat/actions/workflows/desktop.yml) · [开始讨论](#开始讨论) · [连接 Agent](#连接-agent)
+[安装 Skill](#安装-skill) · [发起评审](#发起评审)
 
 ## Why
 
@@ -14,84 +14,27 @@
 
 最后确认方案无异议后用户可以选择Agent来执行。
 
-## 开始讨论
+## 安装 Skill
 
-1. **选项目，提问题。** 添加本地项目文件夹，选至少两位可用的参会 Agent，再指定一位 BOSS（可由参会者兼任）。可以沿用已有配置。输入你的问题和目标，开始讨论。
-2. **各写一版，再互评。** 每位 Agent 先独立写 v1，读完其他人的提案后提出异议，再根据本轮反馈各自写 v2。
-3. **看共同稿，决定取舍。** BOSS 汇总个人修订稿。有需要你决定的事，讨论会暂停；没有待决问题，就由每位 Agent 核对同一份共同稿。只要还有异议，就继续评审。默认最多八轮，到上限时由你决定是否继续。
-4. **交给执行者。** 全员确认后，点击「交给执行 Agent」，选择接手的人选。需要直接修改项目文件时，选择有本地文件工具的 Agent。
+**让 Agent 安装。** 在目标项目里打开你准备用来主持评审的 Codex 或 Claude 会话，把下面这句话发给它：
 
-## 安装与启动
+> 请从 https://github.com/chenmochaos/AllChat 安装 `allchat-deliberation` Skill 到当前项目。按 README 选择适合你自己的目录，装好后告诉我怎么调用。
 
-Windows 和 macOS 用户登录 GitHub，进入 [桌面版构建列表](https://github.com/chenmochaos/AllChat/actions/workflows/desktop.yml)，打开一次成功的构建，在 **Artifacts** 下载对应的包。下载后解开两层 ZIP。
+**手动安装。**
 
-| 平台 | 如何打开 |
-| --- | --- |
-| Windows x64 | 下载 `AllChat-windows-x64`，打开 `AllChat/AllChat.exe`。窗口需要 Microsoft Edge WebView2 Runtime。 |
-| macOS · Apple 芯片 | 下载 `AllChat-macos-arm64`，将 `AllChat.app` 拖入「应用程序」。 |
-| macOS · Intel | 下载 `AllChat-macos-x64`，同样将 `AllChat.app` 拖入「应用程序」。 |
-| Omarchy / Arch Linux x86_64 | 在 `desktop` 目录运行 `makepkg -si`，然后在应用菜单打开 **AllChat**。 |
+在本仓库试用时，Skill 已随仓库提供。在自己的项目中使用时，根据**主持讨论的 Agent** 选择下面一项，将整个 `allchat-deliberation` 文件夹放到目标项目根目录下的对应位置。
 
-Windows 和 macOS 包内置 Python 服务，本地 Agent 需另行安装并配置。macOS 预览包尚未经过 Apple 公证。打开应用时，点击开场动画或按 Esc 即可跳过；开启减少动态效果时会直接进入工作区。
+| T3 中的主持 Agent | 仓库里的文件夹 | 目标项目中的位置 |
+| --- | --- | --- |
+| Codex | [Codex Skill](.agents/skills/allchat-deliberation/) | `.agents/skills/allchat-deliberation/SKILL.md` |
+| Claude | [Claude Skill](.claude/skills/allchat-deliberation/) | `.claude/skills/allchat-deliberation/SKILL.md` |
 
-<details>
-<summary>在 Linux 上运行网页源码版</summary>
+## 发起评审
 
-需要 Linux、Python 3.10 或更高版本。系统文件夹选择器使用 Tk。服务和数据库仅依赖 Python 标准库。
+用 T3 Code 打开目标项目，进入对应的 Agent 会话，选择 `allchat-deliberation`。在消息里写明要解决的问题，并点名至少两位 T3 可调用的参与者。
 
-```sh
-python3 server.py
-```
+> 请让 Claude 和 Codex 各自给一版重复照片整理方案，再互相评审。照片内容一样、文件名不同时，把处理方式留给我选。定稿后我再指定谁来执行。
 
-用浏览器打开终端显示的本机地址。点击「创建项目」选择真实目录。也可使用 `python3 server.py --project .` 导入当前目录。端口默认 8787，可用 `--port` 修改。直接打开 `index.html` 仍可体验离线演示，其历史与真实工作区分开。
+当前会话里的 Agent 担任 BOSS。它收齐各家的独立提案后再分发互评，等作者各自修订后整理共同稿。如果你决定“先列清单，由我勾选”，BOSS 会把这个决定写进新版，请每位参与者重新确认。默认最多评审八轮，仍有分歧时由你决定是否继续。全员确认同一版后，你就可以选执行者。
 
-</details>
-
-## 连接 Agent
-
-| 入口 | 接入条件 |
-| --- | --- |
-| Claude Code | 本机 `claude` 已配置模型服务。保留原生会话编号，后续轮次续聊。 |
-| Codex CLI | 本机 `codex` 已登录。讨论阶段使用只读模式，交接后在项目中执行。 |
-| ChatGPT | 统一的 OpenAI 桌面入口。优先使用配置的桥接或本地 Codex 控制套接字。在带有 `/usr/lib/chatgpt/resources/codex` 的 Linux 安装包上，也可直接启动包内的 Codex 会话服务。记录属于该服务的 Codex 会话。旧配置名「Codex 桌面端」仍可读取。 |
-| Gemini CLI | 本机 Gemini CLI，支持 JSON 输出、plan 模式与 resume。 |
-| DeepSeek Harness | 识别官方 `dsh` 的帮助信息。通过 `dsh headless` 收发并保留会话号。只找到旧的 `deepseek-harness` 启动器时，可配置桥接。 |
-| Claude Desktop | 扫描桌面启动器。自动收发需要对应的桥接或已配置的 Parley 参与者。 |
-| 自定义 API | 配置兼容 Chat Completions 的完整 URL、模型和存放密钥的环境变量名。DeepSeek 等在线服务均可在此配置。 |
-
-本地扫描也识别 Grok Build、OpenCode、OpenClaw、Hermes、Pi、MiniMax Code、Kimi Code、Antigravity、Oh My Pi、Copilot CLI、WorkBuddy 和 ZCode。这些入口支持通过所配置的桥接或 Parley 参与讨论。配置页列出已发现的入口，并保留一个自定义 API 选项。
-
-<details>
-<summary>配置自定义 API、桥接命令或 Parley</summary>
-
-Windows 的 `connections.json` 位于 `%LOCALAPPDATA%\AllChat`，Mac 的位于 `~/Library/Application Support/AllChat`。Linux 桌面版和网页源码版共用 `~/.config/allchat/connections.json`，也可在启动服务时通过 `--config` 指定文件。只填写需要的项，修改后重启。配置示例：
-
-```json
-{
-  "api_url": "http://127.0.0.1:11434/v1/chat/completions",
-  "api_model": "your-local-model",
-  "api_key_env": "ALLCHAT_API_KEY"
-}
-```
-
-可选的 `bridges` 字段把入口名称映射到命令参数数组。AllChat 在项目目录运行该程序，向标准输入发送含 `prompt`、`project`、`history`、`session` 和 `mode` 的 JSON。程序向标准输出返回 `{"text":"实际回复","session":"可恢复的会话标识"}`。桥接程序负责与对应的原应用通信，失败时返回非零退出码。
-
-项目若已安装并配置 Parley CLI，可用 `"parley_agents":{"DeepSeek Harness":"你的参与者编号"}` 委派单次调用。使用上游 `parley agents exec` 的产物检查，AllChat 负责阶段转换。原生 CLI、API 和桥接入口可在同一场讨论混用。API 能处理用户选定的材料和文本交付。需要直接读写本地项目时，请选择具备文件工具的执行端。
-
-</details>
-
-## 保存与恢复
-
-每次讨论的提案、互评、个人修订稿、共同稿、签认和交接记录都保存在项目的 `parley-deck/ideas/allchat-<讨论编号>/` 里。AllChat 自行记录工作流状态；Parley 的严格验证结果需要另行调用上游协议验证器。
-
-Windows 和 macOS 的项目配置与运行状态保存在各自的连接配置目录。Linux 桌面版默认保存在 `~/.local/state/allchat-desktop`，网页源码版保存在 `~/.local/state/allchat`，两者都遵循 `XDG_STATE_HOME`。启动服务时可用 `--data-dir` 指定目录。
-
-输入框用于向 BOSS 提问。涉及取舍时使用「补充并继续」登记决定，定稿后也可以「修改要求」。修改方案或名单会触发新的评审和签认。默认最多八轮，配置中可选择不限轮数。
-
-讨论在服务端运行。关闭浏览器后可以继续；服务重启时，已经返回的提交保留。派发中断的调用标作待核对，可查看评审记录里的原生会话编号，再单独重试。执行端可能已经产生文件或费用；调用结果不明时请先核对接收方。
-
-## 验证
-
-```sh
-python3 -m unittest -v test_workflow
-```
+提案、评审意见、用户决定和签认记录保存在项目的 `parley-deck/ideas/allchat-<讨论标识>/`。在新会话里继续时，告诉 BOSS 要恢复哪一场讨论即可。
