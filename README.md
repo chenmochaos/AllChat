@@ -1,5 +1,7 @@
 # ![AllChat · Multi-agent planning automation](docs/readme-intro.gif)
 
+**简体中文** | [English](README.en.md)
+
 AllChat 是一个在 T3 Code 中使用的多 Agent 方案评审 Skill。各个 Agent 先独立出方案，再互相挑问题。BOSS 把需要你拍板的取舍讲清楚。**只有全员确认同一版方案，才交给你选的 Agent 执行。**
 
 [安装 Skill](#安装-skill) · [发起评审](#发起评审)
@@ -18,7 +20,7 @@ AllChat 是一个在 T3 Code 中使用的多 Agent 方案评审 Skill。各个 A
 
 **让 Agent 安装。** 在目标项目里打开你准备用来主持评审的 Codex 或 Claude 会话，把下面这句话发给它：
 
-> 请从 https://github.com/chenmochaos/AllChat 安装 `allchat-deliberation` Skill 到当前项目。按 README 选择适合你自己的目录，装好后告诉我怎么调用。
+> 请从 https://github.com/chenmochaos/AllChat.skill 安装 `allchat-deliberation` Skill 到当前项目。按 README 选择适合你自己的目录，装好后告诉我怎么调用。
 
 **手动安装。**
 
